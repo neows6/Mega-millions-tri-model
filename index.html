@@ -11,24 +11,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Pre-Babel cache loader — plain JS, runs synchronously before Babel compiles.
-       Reads localStorage into window.__mmCache so React initial state is instant. -->
-  <script>
-  (function() {
-    var KEY = 'mm_ball_cache_v2';
-    try {
-      var raw = localStorage.getItem(KEY);
-      if (raw) {
-        var d = JSON.parse(raw);
-        if (d && d.lastDate && d.lastDate > '2026-04-24' &&
-            Array.isArray(d.balls) && d.balls.length === 70 &&
-            Array.isArray(d.mega)  && d.mega.length  === 24) {
-          window.__mmCache = d;
-        }
-      }
-    } catch(e) { window.__mmCache = null; }
-  })();
-  </script>
+  <!-- Ball frequency data always loaded fresh from API on mount -->
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     html,body{background:#020812;min-height:100vh}
@@ -179,8 +162,8 @@ function saveBallCache(balls, mega, lastDate, total, recentWindow) {
   window.__mmCache = payload;
 }
 
-// Use the pre-loaded global — set by the plain <script> before Babel ran
-var _initCache = window.__mmCache || null;
+// Always null — picks always come from live API, never from stale cache
+var _initCache = null;
 
 // =====================================================================
 // LIVE FETCH & MERGE
@@ -991,19 +974,16 @@ function TrackerTab(props){
 // =====================================================================
 function App(){
   // Use cached data if available for instant display, fall back to baseline
-  var bS=useState(_initCache ? _initCache.balls : BASE_BALL_DATA); var balls=bS[0],setBalls=bS[1];
-  var mS=useState(_initCache ? _initCache.mega  : BASE_MEGA_DATA);  var mega=mS[0],setMega=mS[1];
-  // recentDraws: last 30 raw draws [{balls:[..], mega:N}] — the key to responsive picks
-  var rdS=useState(_initCache && _initCache.recentWindow ? _initCache.recentWindow : []);
-  var recentDraws=rdS[0],setRecentDraws=rdS[1];
-  var stS=useState(_initCache ? "ready" : "loading"); var appStatus=stS[0],setAppStatus=stS[1];
-  var iS=useState(_initCache ? {
-    totalLoaded:_initCache.total-BASE_DRAWS, lastDrawDate:_initCache.lastDate,
-    lastChecked:null, newOnRefresh:null, phase:"loaded", total:_initCache.total, error:null
-  } : {totalLoaded:0,lastDrawDate:BASELINE_DATE,lastChecked:null,newOnRefresh:null,phase:"loading",total:BASE_DRAWS,error:null});
+  // Always start from baseline — picks come from live API fetch, never from stale cache
+  var bS=useState(BASE_BALL_DATA); var balls=bS[0],setBalls=bS[1];
+  var mS=useState(BASE_MEGA_DATA); var mega=mS[0],setMega=mS[1];
+  var rdS=useState([]);            var recentDraws=rdS[0],setRecentDraws=rdS[1];
+  var stS=useState("loading");     var appStatus=stS[0],setAppStatus=stS[1];
+  var iS=useState({totalLoaded:0,lastDrawDate:BASELINE_DATE,lastChecked:null,
+    newOnRefresh:null,phase:"loading",total:BASE_DRAWS,error:null});
   var info=iS[0],setInfo=iS[1];
   var rS=useState(false);          var refreshing=rS[0],setRefreshing=rS[1];
-  var lastLoadedDateRef=useRef(_initCache ? _initCache.lastDate : BASELINE_DATE);
+  var lastLoadedDateRef=useRef(BASELINE_DATE);
   var tS=useState("compare");      var tab=tS[0],setTab=tS[1];
   var seS=useState(null);          var sel=seS[0],setSel=seS[1];
   var eS=useState(false);          var showEV=eS[0],setShowEV=eS[1];
@@ -1032,15 +1012,8 @@ function App(){
         setBalls(m.balls);
         setMega(m.mega);
         saveBallCache(m.balls, m.mega, latestDate, BASE_DRAWS+nd.length, recentParsed);
-      } else {
-        // No new draws but update recent window anyway
-        var curCache=window.__mmCache;
-        saveBallCache(
-          curCache?curCache.balls:balls,
-          curCache?curCache.mega:mega,
-          latestDate, info.total, recentParsed
-        );
       }
+      // If nd.length===0: no new draws since baseline — no cache update needed
       setRecentDraws(recentParsed);
       lastLoadedDateRef.current=latestDate;
       setInfo({
@@ -1293,8 +1266,7 @@ function App(){
           <span style={{fontSize:"7px",color:"#4a7898"}}>LATEST: {info.lastDrawDate}</span>
           <span style={{fontSize:"7px",color:"#4a7898"}}>{info.total.toLocaleString()} DRAWS</span>
           <span style={{fontSize:"6px",color:"#4a7090"}}>
-            {window.__mmCache ? "CACHED "+new Date(window.__mmCache.savedAt).toLocaleDateString()+" / " : "NO CACHE / "}
-            WINDOW: {recentDraws.length} DRAWS / TICK {tick}
+            {window.__mmCache && window.__mmCache.lastDate ? "SYNCED "+window.__mmCache.lastDate+" / " : ""}WINDOW: {recentDraws.length} DRAWS / TICK {tick}
           </span>
         </div>
         <button onClick={function(){doFetch(true);}} disabled={refreshing} style={{
@@ -1736,9 +1708,9 @@ function HelpModal(props) {
 // Mount
 var rootEl=ReactDOM.createRoot(document.getElementById("root"));
 rootEl.render(React.createElement(App,null));
-// Skip loading screen instantly if cache was pre-loaded, otherwise wait for API
-var _loadDelay = window.__mmCache ? 0 : 1400;
-setTimeout(function(){var l=document.getElementById("loading");if(l){l.style.opacity="0";setTimeout(function(){l.remove();},300);}},_loadDelay);
+// Loading screen stays until React mounts and API fetch completes (handled by appStatus)
+// Fallback: remove after 8s in case of slow network
+setTimeout(function(){var l=document.getElementById("loading");if(l){l.style.opacity="0";setTimeout(function(){l.remove();},400);}},8000);
 </script>
 </body>
 </html>
