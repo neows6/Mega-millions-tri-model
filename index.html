@@ -8,49 +8,49 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    html, body { background:#020812; min-height:100vh; }
-    body { overflow-x:hidden; }
-    button { font-family:inherit; }
-    ::-webkit-scrollbar { width:6px; }
-    ::-webkit-scrollbar-track { background:#010608; }
-    ::-webkit-scrollbar-thumb { background:#0a2040; border-radius:3px; }
-    ::-webkit-scrollbar-thumb:hover { background:#0d3060; }
-    #root { min-height:100vh; }
-    /* Loading screen */
-    #loading {
-      position:fixed; inset:0; background:#020812;
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      font-family:'Courier New',monospace; color:#00b8ff; z-index:9999;
-      transition:opacity 0.5s;
-    }
-    #loading .title { font-size:18px; letter-spacing:0.2em; font-weight:900;
-      text-transform:uppercase; margin-bottom:16px; }
-    #loading .bar-wrap { width:280px; height:3px; background:#0a1a30; border-radius:2px; overflow:hidden; }
-    #loading .bar { height:100%; width:0; background:linear-gradient(90deg,#00e5ff,#e040fb);
-      border-radius:2px; animation:loadBar 1.8s ease forwards; }
-    @keyframes loadBar { 0%{width:0} 100%{width:100%} }
-    #loading .sub { font-size:9px; color:#1e4060; letter-spacing:0.3em; margin-top:10px;
-      text-transform:uppercase; }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    html,body{background:#020812;min-height:100vh}
+    body{overflow-x:hidden}
+    button{font-family:inherit}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:#010608}
+    ::-webkit-scrollbar-thumb{background:#0a2040;border-radius:3px}
+    #root{min-height:100vh}
+    #loading{position:fixed;inset:0;background:#020812;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;font-family:"Courier New",monospace;
+      color:#00b8ff;z-index:9999;transition:opacity 0.6s ease}
+    #loading .logo{font-size:clamp(14px,3vw,20px);font-weight:900;letter-spacing:0.2em;
+      text-transform:uppercase;margin-bottom:14px;
+      background:linear-gradient(90deg,#00e5ff,#e040fb,#00e676,#00e5ff);
+      background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      animation:lShimmer 2s linear infinite}
+    @keyframes lShimmer{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+    #loading .bar-wrap{width:300px;height:3px;background:#0a1a30;border-radius:2px;overflow:hidden;margin-bottom:10px}
+    #loading .bar{height:100%;background:linear-gradient(90deg,#00e5ff,#e040fb);
+      border-radius:2px;animation:loadBar 2s ease forwards}
+    @keyframes loadBar{0%{width:0}60%{width:70%}100%{width:100%}}
+    #loading .sub{font-size:8px;color:#1e4060;letter-spacing:0.3em;text-transform:uppercase}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes shimmer{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+    @keyframes flowIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes qFlick{0%,100%{opacity:1}50%{opacity:0.55}}
+    .bc:hover{transform:scale(1.11)!important;z-index:10!important}
+    .ts{animation:flowIn 0.3s ease}
   </style>
 </head>
 <body>
   <div id="loading">
-    <div class="title">⚡ Tri-Model Loading ⚡</div>
+    <div class="logo">&#9889; Mega Millions Tri-Model System &#9889;</div>
     <div class="bar-wrap"><div class="bar"></div></div>
-    <div class="sub">Initializing fluid dynamics · quantum states · smart play</div>
+    <div class="sub">Fetching latest draw data from NY Open Data&#8230;</div>
   </div>
   <div id="root"></div>
 
-  <script type="text/babel" data-presets="react">
-    const { useState, useMemo, useEffect } = React;
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useEffect } = React;
 
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// DATA — LottoAmerica.com · 3,019 draws · Sep 6 1996 → Apr 24 2026
-// [num, allTimeFreq, drawsAgo]
-// ═══════════════════════════════════════════════════════════════════════════════
-const BALL_DATA = [
+const BASE_BALL_DATA = [
   [1,242,1],[2,267,29],[3,258,5],[4,268,9],[5,258,5],[6,251,13],[7,246,1],
   [8,253,15],[9,238,31],[10,281,39],[11,270,11],[12,248,17],[13,250,9],
   [14,269,49],[15,244,5],[16,250,1],[17,285,3],[18,257,5],[19,229,13],
@@ -62,545 +62,424 @@ const BALL_DATA = [
   [50,247,11],[51,210,11],[52,206,9],[53,180,9],[54,155,15],[55,140,11],
   [56,169,1],[57,89,3],[58,104,1],[59,89,21],[60,76,7],[61,81,51],
   [62,94,3],[63,85,7],[64,93,29],[65,74,7],[66,101,25],[67,68,17],
-  [68,87,7],[69,88,3],[70,83,27],
+  [68,87,7],[69,88,3],[70,83,27]
 ];
-const MEGA_DATA = [
+
+const BASE_MEGA_DATA = [
   [1,117,21],[2,100,5],[3,117,81],[4,108,11],[5,85,25],[6,105,5],
   [7,113,1],[8,97,3],[9,116,13],[10,110,9],[11,100,77],[12,98,1],
   [13,103,25],[14,91,19],[15,107,7],[16,69,9],[17,81,7],[18,80,37],
-  [19,82,23],[20,76,87],[21,83,23],[22,89,65],[23,61,17],[24,95,11],
+  [19,82,23],[20,76,87],[21,83,23],[22,89,65],[23,61,17],[24,95,11]
 ];
-// All-time most common pairs (lottoamerica.com) — used for quantum entanglement
+
 const ENTANGLED_PAIRS = [[18,31],[29,32],[17,21],[8,10],[16,36],[4,34],[6,26],[10,40],[14,46],[31,46]];
-const JACKPOT_M = 163; // current jackpot $M
-const TOTAL_DRAWS = 3019;
+const BASE_DRAWS    = 3019;
+const BASELINE_DATE = "2026-04-24";
+const API_URL       = "https://data.ny.gov/resource/5xaw-6ayf.json";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODEL 1 — NAVIER-STOKES FLUID DYNAMICS
-// ═══════════════════════════════════════════════════════════════════════════════
-function modelFluid(data, poolSize, ballsPerDraw) {
-  const freqs = data.map(d => d[1]);
-  const fMean = freqs.reduce((a,b)=>a+b,0)/freqs.length;
-  const fMax  = Math.max(...freqs), fMin = Math.min(...freqs);
-  const rho=1, mu=0.08, L=poolSize;
-  return data.map(([num,freq,ago]) => {
-    const P  = freq/fMean;
-    const ei = poolSize/ballsPerDraw;
-    const v  = Math.min(ei/(ago+1), 3.0);
-    const Re = rho*v*L/mu;
-    const B  = P + 0.5*rho*v*v;
-    const w  = Math.abs(P-1);
-    const od = ago>ei*2 ? 0.25*Math.min(ago/(ei*8),0.5) : 0;
-    const score = 0.38*v + 0.30*P + 0.18*(1/(w+0.4)) + 0.09*(freq/fMax) + 0.05*((freq-fMin)/(fMax-fMin+1)) + od;
-    const regime = Re>4000?"turbulent":Re>2300?"transitional":"laminar";
-    return { num, freq, ago, score, P, v, Re, B, w, regime,
-             metrics:[["Pressure P",P.toFixed(4)],["Velocity v",v.toFixed(4)],
-                      ["Reynolds Re",Math.round(Re)],["Bernoulli B",B.toFixed(4)],
-                      ["Vorticity ω",w.toFixed(4)],["NS-Score",score.toFixed(5)]] };
-  });
+async function fetchNewDrawings() {
+  const url = API_URL + "?$order=draw_date%20DESC&$limit=200";
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return data
+    .filter(function(d){ return (d.draw_date || "").substring(0,10) > BASELINE_DATE; })
+    .sort(function(a,b){ return a.draw_date.localeCompare(b.draw_date); });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODEL 2 — SMART PLAY (Split-Avoidance + Gap-Spring + Balance Filter)
-// ═══════════════════════════════════════════════════════════════════════════════
-function modelSmart(data, poolSize, ballsPerDraw) {
-  const freqs = data.map(d=>d[1]);
-  const fMean = freqs.reduce((a,b)=>a+b,0)/freqs.length;
-  const fMax  = Math.max(...freqs);
-  const ei    = poolSize/ballsPerDraw; // expected interval between draws
-
-  // Estimated player popularity — birthday bias (1-31 heavily played), round numbers, etc.
-  const popularityWeight = (n) => {
-    let w = 1.0;
-    if (n <= 31)  w *= 1.85; // birthday bias — hugely overplayed
-    if (n <= 12)  w *= 1.20; // month numbers
-    if (n % 10 === 0) w *= 1.30; // round numbers
-    if ([7,11,13,17,21,23].includes(n)) w *= 1.40; // "lucky" numbers
-    return w;
-  };
-
-  return data.map(([num,freq,ago]) => {
-    // Gap-spring energy: compressed spring potential E = ½k(x-x₀)²
-    // Analogy: a spring compressed beyond natural length stores energy & wants to release
-    const k          = 1.0; // spring constant
-    const naturalGap = ei;
-    const compression = Math.max(ago - naturalGap, 0);
-    const springE    = 0.5 * k * compression * compression / (ei * ei); // normalized
-
-    // Frequency regression pressure: balls overdue relative to their own draw rate
-    const expectedFreq = TOTAL_DRAWS / poolSize * ballsPerDraw;
-    const freqDeficit  = Math.max(expectedFreq - freq, 0) / expectedFreq;
-
-    // Split-avoidance: reward unpopular numbers
-    const pop    = popularityWeight(num);
-    const unpop  = 1 / pop; // high for unpopular numbers
-
-    // Recency balance: slightly penalize balls drawn very recently (just appeared)
-    const recencyPenalty = ago < 3 ? 0.15 * (3 - ago) : 0;
-
-    // EV signal contribution (higher jackpot = higher EV weight)
-    const evBonus = JACKPOT_M > 700 ? 0.1 : JACKPOT_M > 400 ? 0.05 : 0;
-
-    const score = 0.35*springE + 0.25*unpop + 0.20*freqDeficit
-                + 0.15*((freq-Math.min(...freqs))/(fMax-Math.min(...freqs)+1))
-                + 0.05*evBonus - recencyPenalty;
-
-    const tag = pop>1.5?"⚠ Overplayed":pop>1.2?"△ Popular":"✓ Contrarian";
-    return { num, freq, ago, score, springE, unpop, freqDeficit, pop, tag,
-             metrics:[["Spring Energy",springE.toFixed(4)],["Unpopularity",unpop.toFixed(4)],
-                      ["Freq Deficit",freqDeficit.toFixed(4)],["Pop Weight",pop.toFixed(2)],
-                      ["EV Bonus",evBonus.toFixed(2)],["Smart Score",score.toFixed(5)]] };
+function mergeDrawings(newDraws) {
+  var bm = {};
+  BASE_BALL_DATA.forEach(function(row){ bm[row[0]] = [row[0],row[1],row[2]]; });
+  var mm = {};
+  BASE_MEGA_DATA.forEach(function(row){ mm[row[0]] = [row[0],row[1],row[2]]; });
+  var total = newDraws.length;
+  newDraws.forEach(function(d, idx) {
+    var balls = (d.winning_numbers||"").trim().split(/\s+/).map(Number).filter(function(n){return n>=1&&n<=70;});
+    var mega  = parseInt(d.mega_ball||"0", 10);
+    var ago   = total - idx;
+    balls.forEach(function(n){ if(bm[n]){bm[n][1]+=1;bm[n][2]=ago;} });
+    if(mm[mega]){mm[mega][1]+=1;mm[mega][2]=ago;}
   });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODEL 3 — QUANTUM ENTANGLEMENT THEORY (For Science & Fun)
-// Wave function: ψ(n) = √(f/N) · e^(iθ)   where θ = 2π·ago/T
-// Probability:  P(n) = |ψ(n)|² after interference, entanglement & tunneling
-// ═══════════════════════════════════════════════════════════════════════════════
-function modelQuantum(data, poolSize, ballsPerDraw) {
-  const freqs = data.map(d=>d[1]);
-  const fTotal = freqs.reduce((a,b)=>a+b,0);
-  const ei = poolSize/ballsPerDraw;
-
-  // Entanglement map: which numbers share quantum correlation
-  const entangleBoost = {};
-  ENTANGLED_PAIRS.forEach(([a,b]) => {
-    entangleBoost[a] = (entangleBoost[a]||0) + 0.08;
-    entangleBoost[b] = (entangleBoost[b]||0) + 0.08;
-  });
-
-  return data.map(([num,freq,ago]) => {
-    // Wave function amplitude |ψ| = √(freq/total_appearances)
-    const amplitude = Math.sqrt(freq / fTotal);
-
-    // Phase angle: θ = 2π × (ago / expectedInterval)
-    // When ago ≈ expectedInterval → θ ≈ 2π → constructive resonance
-    const theta = (2 * Math.PI * ago) / ei;
-
-    // Real and imaginary parts of ψ
-    const psiReal = amplitude * Math.cos(theta);
-    const psiImag = amplitude * Math.sin(theta);
-
-    // Probability density BEFORE interference: |ψ|²
-    const probRaw = psiReal*psiReal + psiImag*psiImag;
-
-    // Interference term: constructive if cos(θ) > 0, destructive if < 0
-    // Numbers "in phase" with their natural return cycle interfere constructively
-    const interference = Math.cos(theta); // +1 = constructive, -1 = destructive
-
-    // Quantum tunneling: cold numbers can tunnel through the "probability barrier"
-    // P_tunnel = e^(-κ·barrier) where barrier = how far below expected freq
-    const expectedF   = fTotal / poolSize;
-    const barrier     = Math.max(expectedF - freq, 0) / expectedF;
-    const kappa       = 1.8; // tunneling decay constant
-    const tunneling   = Math.exp(-kappa * barrier) * 0.12;
-
-    // Decoherence: recently drawn balls have "collapsed" — less superposition
-    const decoherence = ago < 4 ? Math.exp(-(4-ago)*0.4) : 1.0;
-
-    // Entanglement boost from correlated pair partners
-    const entanglement = entangleBoost[num] || 0;
-
-    // Schrödinger energy eigenvalue: E = ½ℏω² (kinetic) + V (potential well)
-    // Map to: kinetic = amplitude²/2, potential = 1/(ago+1)
-    const hbar   = 0.5; // reduced Planck analog
-    const omega  = 2*Math.PI/ei;
-    const Ekin   = 0.5 * hbar * omega * omega * amplitude * amplitude;
-    const Epot   = 1/(ago+1);
-    const Etotal = Ekin + Epot;
-
-    // Final quantum probability score
-    const score = (probRaw * (1 + interference * 0.5) + tunneling + entanglement)
-                * decoherence + 0.15 * Etotal;
-
-    const state = ago < 4 ? "COLLAPSED" : interference > 0.3 ? "RESONANT"
-                : interference < -0.3 ? "DESTRUCTIVE" : "SUPERPOSED";
-    return { num, freq, ago, score, amplitude, theta, probRaw, interference,
-             tunneling, decoherence, entanglement, Etotal, state,
-             metrics:[["Amplitude |ψ|",amplitude.toFixed(5)],
-                      ["Phase θ (rad)",(theta%(2*Math.PI)).toFixed(4)],
-                      ["Interference",interference.toFixed(4)],
-                      ["Tunneling",tunneling.toFixed(4)],
-                      ["Decoherence",decoherence.toFixed(4)],
-                      ["QE Score",score.toFixed(5)]] };
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// BALANCE FILTER — applied to combo selection for Model 2
-// ═══════════════════════════════════════════════════════════════════════════════
-function applyBalanceFilter(candidates) {
-  // Pick top N candidates and find the best 5-ball combo by balance score
-  const pool = candidates.slice(0, 20);
-  let best = null, bestBalance = -Infinity;
-  // Try combinations from top 12
-  const top12 = pool.slice(0,12).map(s=>s.num);
-  for (let a=0;a<top12.length;a++)
-  for (let b=a+1;b<top12.length;b++)
-  for (let c=b+1;c<top12.length;c++)
-  for (let d=c+1;d<top12.length;d++)
-  for (let e=d+1;e<top12.length;e++) {
-    const combo = [top12[a],top12[b],top12[c],top12[d],top12[e]];
-    const sum   = combo.reduce((x,y)=>x+y,0);
-    const odds  = combo.filter(n=>n%2!==0).length;
-    const lows  = combo.filter(n=>n<=35).length;
-    // Ideal: sum 100-175, 2-3 odd, 2-3 low
-    const sumOK  = sum>=100 && sum<=175 ? 1 : 0;
-    const oddOK  = odds>=2 && odds<=3  ? 1 : 0;
-    const lowOK  = lows>=2 && lows<=3  ? 1 : 0;
-    const totalS = pool.filter(s=>combo.includes(s.num)).reduce((x,s)=>x+s.score,0);
-    const balance = sumOK*2 + oddOK*1.5 + lowOK*1.5 + totalS*0.5;
-    if (balance > bestBalance) { bestBalance=balance; best=combo; }
+  if(total > 0){
+    var last = newDraws[total-1];
+    var lb   = (last.winning_numbers||"").trim().split(/\s+/).map(Number);
+    var lm   = parseInt(last.mega_ball||"0",10);
+    lb.forEach(function(n){ if(bm[n]) bm[n][2]=1; });
+    if(mm[lm]) mm[lm][2]=1;
   }
-  return best ? best.sort((a,b)=>a-b) : candidates.slice(0,5).map(s=>s.num).sort((a,b)=>a-b);
+  return { balls: Object.values(bm), mega: Object.values(mm) };
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// COLORS
-// ═══════════════════════════════════════════════════════════════════════════════
-const THEME = {
-  fluid:   { primary:"#00e5ff", secondary:"#0090b8", glow:"rgba(0,229,255,0.4)",   bg:"rgba(0,40,80,0.7)",   border:"rgba(0,200,255,0.25)" },
-  smart:   { primary:"#00e676", secondary:"#007a40", glow:"rgba(0,230,118,0.4)",   bg:"rgba(0,50,20,0.7)",   border:"rgba(0,200,100,0.25)" },
-  quantum: { primary:"#e040fb", secondary:"#7b1fa2", glow:"rgba(224,64,251,0.4)",  bg:"rgba(40,0,60,0.7)",   border:"rgba(200,50,250,0.25)" },
-  gold:    { primary:"#ffd600", glow:"rgba(255,214,0,0.4)" },
+function modelFluid(data, pool, bpd) {
+  var freqs = data.map(function(d){return d[1];});
+  var fMean = freqs.reduce(function(a,b){return a+b;},0)/freqs.length;
+  var fMax  = Math.max.apply(null,freqs);
+  var fMin  = Math.min.apply(null,freqs);
+  return data.map(function(row){
+    var num=row[0],freq=row[1],ago=row[2];
+    var P=freq/fMean, ei=pool/bpd, v=Math.min(ei/(ago+1),3.0);
+    var Re=(v*pool)/0.08, B=P+0.5*v*v, w=Math.abs(P-1);
+    var od=ago>ei*2?0.25*Math.min(ago/(ei*8),0.5):0;
+    var score=0.38*v+0.30*P+0.18*(1/(w+0.4))+0.09*(freq/fMax)+0.05*((freq-fMin)/(fMax-fMin+1))+od;
+    return {num:num,freq:freq,ago:ago,score:score,P:P,v:v,Re:Re,B:B,w:w,
+      regime:Re>4000?"turbulent":Re>2300?"transitional":"laminar",
+      metrics:[["Pressure P",P.toFixed(4)],["Velocity v",v.toFixed(4)],["Reynolds",Math.round(Re)],
+               ["Bernoulli B",B.toFixed(4)],["Vorticity w",w.toFixed(4)],["NS-Score",score.toFixed(5)]]};
+  });
+}
+
+function modelSmart(data, pool, bpd, totalDraws) {
+  var freqs = data.map(function(d){return d[1];});
+  var fMax  = Math.max.apply(null,freqs);
+  var fMin  = Math.min.apply(null,freqs);
+  var ei    = pool/bpd;
+  function popW(n){
+    var w=1;
+    if(n<=31) w*=1.85; if(n<=12) w*=1.20;
+    if(n%10===0) w*=1.30;
+    if([7,11,13,17,21,23].indexOf(n)>=0) w*=1.40;
+    return w;
+  }
+  return data.map(function(row){
+    var num=row[0],freq=row[1],ago=row[2];
+    var comp=Math.max(ago-ei,0), springE=0.5*comp*comp/(ei*ei);
+    var expF=totalDraws/pool*bpd, freqDef=Math.max(expF-freq,0)/expF;
+    var pop=popW(num), unpop=1/pop, recPen=ago<3?0.15*(3-ago):0;
+    var score=0.35*springE+0.25*unpop+0.20*freqDef+0.15*((freq-fMin)/(fMax-fMin+1))-recPen;
+    return {num:num,freq:freq,ago:ago,score:score,springE:springE,unpop:unpop,freqDef:freqDef,pop:pop,
+      tag:pop>1.5?"Overplayed":pop>1.2?"Popular":"Contrarian",
+      metrics:[["Spring E",springE.toFixed(4)],["Unpopularity",unpop.toFixed(4)],
+               ["Freq Deficit",freqDef.toFixed(4)],["Pop Weight",pop.toFixed(2)],
+               ["Smart Score",score.toFixed(5)]]};
+  });
+}
+
+function modelQuantum(data, pool, bpd) {
+  var freqs  = data.map(function(d){return d[1];});
+  var fTotal = freqs.reduce(function(a,b){return a+b;},0);
+  var ei     = pool/bpd;
+  var eB     = {};
+  ENTANGLED_PAIRS.forEach(function(pair){
+    var a=pair[0],b=pair[1];
+    eB[a]=(eB[a]||0)+0.08; eB[b]=(eB[b]||0)+0.08;
+  });
+  return data.map(function(row){
+    var num=row[0],freq=row[1],ago=row[2];
+    var amp=Math.sqrt(freq/fTotal), theta=(2*Math.PI*ago)/ei;
+    var pR=amp*Math.cos(theta), pI=amp*Math.sin(theta), prob=pR*pR+pI*pI;
+    var interf=Math.cos(theta), barrier=Math.max(fTotal/pool-freq,0)/(fTotal/pool);
+    var tunnel=Math.exp(-1.8*barrier)*0.12, decoh=ago<4?Math.exp(-(4-ago)*0.4):1.0;
+    var entangle=eB[num]||0;
+    var omega=2*Math.PI/ei, Etotal=0.5*0.5*omega*omega*amp*amp+1/(ago+1);
+    var score=(prob*(1+interf*0.5)+tunnel+entangle)*decoh+0.15*Etotal;
+    var state=ago<4?"COLLAPSED":interf>0.3?"RESONANT":interf<-0.3?"DESTRUCTIVE":"SUPERPOSED";
+    return {num:num,freq:freq,ago:ago,score:score,amplitude:amp,theta:theta,interference:interf,
+             tunneling:tunnel,decoherence:decoh,entanglement:entangle,state:state,
+      metrics:[["Amplitude",amp.toFixed(5)],["Phase",(theta%(2*Math.PI)).toFixed(4)],
+               ["Interference",interf.toFixed(4)],["Tunneling",tunnel.toFixed(4)],
+               ["Decoherence",decoh.toFixed(4)],["QE Score",score.toFixed(5)]]};
+  });
+}
+
+function applyBalanceFilter(cands) {
+  var top12 = cands.slice(0,12).map(function(s){return s.num;});
+  var best=null, bestB=-Infinity;
+  for(var a=0;a<top12.length;a++)
+  for(var b=a+1;b<top12.length;b++)
+  for(var c=b+1;c<top12.length;c++)
+  for(var d=c+1;d<top12.length;d++)
+  for(var e=d+1;e<top12.length;e++){
+    var cb=[top12[a],top12[b],top12[c],top12[d],top12[e]];
+    var sum=cb.reduce(function(x,y){return x+y;},0);
+    var odds=cb.filter(function(n){return n%2!==0;}).length;
+    var lows=cb.filter(function(n){return n<=35;}).length;
+    var ts=cands.filter(function(s){return cb.indexOf(s.num)>=0;}).reduce(function(x,s){return x+s.score;},0);
+    var bal=(sum>=100&&sum<=175?2:0)+(odds>=2&&odds<=3?1.5:0)+(lows>=2&&lows<=3?1.5:0)+ts*0.5;
+    if(bal>bestB){bestB=bal;best=cb;}
+  }
+  return best ? best.sort(function(a,b){return a-b;}) : cands.slice(0,5).map(function(s){return s.num;}).sort(function(a,b){return a-b;});
+}
+
+var TH = {
+  fluid:  {p:"#00e5ff",s:"#0090b8",g:"rgba(0,229,255,0.4)",  bg:"rgba(0,40,80,0.7)",  br:"rgba(0,200,255,0.25)"},
+  smart:  {p:"#00e676",s:"#007a40",g:"rgba(0,230,118,0.4)",  bg:"rgba(0,50,20,0.7)",  br:"rgba(0,200,100,0.25)"},
+  quantum:{p:"#e040fb",s:"#7b1fa2",g:"rgba(224,64,251,0.4)", bg:"rgba(40,0,60,0.7)",  br:"rgba(200,50,250,0.25)"},
+  gold:   {p:"#ffd600",g:"rgba(255,214,0,0.4)"}
 };
-const MODEL_THEMES = ["fluid","smart","quantum"];
-const MODEL_LABELS = ["⚗ Fluid Dynamics","🎯 Smart Play","⚛ Quantum"];
-const MODEL_SUBTITLES = [
-  "Navier-Stokes · Bernoulli · Reynolds",
-  "Spring Pressure · Split Avoidance · EV Filter",
-  "Wave Function · Entanglement · Tunneling",
-];
+var MK = ["fluid","smart","quantum"];
+var ML = ["Fluid Dynamics","Smart Play","Quantum"];
+var MS = ["Navier-Stokes / Reynolds / Bernoulli","Spring Energy / Split Avoidance / Balance","Wave Function / Tunneling / Entanglement"];
 
-function ballColor(model, score, maxScore) {
-  const t = THEME[MODEL_THEMES[model]];
-  return { border: t.primary, glow: t.glow, text: t.primary };
+function qsc(s){
+  if(s==="RESONANT") return "#e040fb";
+  if(s==="COLLAPSED") return "#ff3333";
+  if(s==="DESTRUCTIVE") return "#448aff";
+  return "#a78bfa";
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ROOT COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
-function TriModelPredictor() {
-  const [activeTab, setActiveTab] = useState("compare");
-  const [selectedBall, setSelectedBall] = useState(null); // {modelIdx, num}
-  const [tick, setTick] = useState(0);
-  const [showEV, setShowEV] = useState(false);
+function mkPanel(k){
+  return {background:TH[k||"fluid"].bg, border:"1px solid "+TH[k||"fluid"].br,
+    borderRadius:"8px", padding:"13px", marginBottom:"10px"};
+}
+function mkLbl(c){
+  return {fontSize:"8px", letterSpacing:"0.3em", color:c||"#2a5a90",
+    textTransform:"uppercase", marginBottom:"9px", display:"block"};
+}
 
-  useEffect(()=>{
-    const id=setInterval(()=>setTick(t=>t+1),2000);
-    return ()=>clearInterval(id);
-  },[]);
-
-  // Run all three models
-  const fluidBalls  = useMemo(()=>modelFluid(BALL_DATA,70,5),[]);
-  const smartBalls  = useMemo(()=>modelSmart(BALL_DATA,70,5),[]);
-  const quantumBalls= useMemo(()=>modelQuantum(BALL_DATA,70,5),[]);
-  const fluidMB     = useMemo(()=>modelFluid(MEGA_DATA,24,1),[]);
-  const smartMB     = useMemo(()=>modelSmart(MEGA_DATA,24,1),[]);
-  const quantumMB   = useMemo(()=>modelQuantum(MEGA_DATA,24,1),[]);
-
-  // Predictions
-  const predictions = useMemo(()=>{
-    const fTop  = [...fluidBalls].sort((a,b)=>b.score-a.score);
-    const sTop  = [...smartBalls].sort((a,b)=>b.score-a.score);
-    const qTop  = [...quantumBalls].sort((a,b)=>b.score-a.score);
-    return [
-      { main: fTop.slice(0,5).map(s=>s.num).sort((a,b)=>a-b),
-        mega: [...fluidMB].sort((a,b)=>b.score-a.score)[0].num },
-      { main: applyBalanceFilter(sTop),
-        mega: [...smartMB].sort((a,b)=>b.score-a.score)[0].num },
-      { main: qTop.slice(0,5).map(s=>s.num).sort((a,b)=>a-b),
-        mega: [...quantumMB].sort((a,b)=>b.score-a.score)[0].num },
-    ];
-  },[fluidBalls,smartBalls,quantumBalls,fluidMB,smartMB,quantumMB]);
-
-  const allScores = [fluidBalls, smartBalls, quantumBalls];
-  const allMB     = [fluidMB, smartMB, quantumMB];
-
-  // Selected ball detail
-  const detailData = useMemo(()=>{
-    if (!selectedBall) return null;
-    return allScores[selectedBall.modelIdx].find(s=>s.num===selectedBall.num);
-  },[selectedBall,fluidBalls,smartBalls,quantumBalls]);
-
-  // EV calculation
-  const ticketCost = 2;
-  const lumpSumFactor = 0.60;
-  const taxFactor = 0.63;
-  const jackpotEV = (JACKPOT_M*1e6 * lumpSumFactor * taxFactor) / 302575350;
-  const netEV = jackpotEV - ticketCost;
-  const evPositive = netEV > 0;
-
-  const S = {
-    root: {
-      background:"linear-gradient(160deg,#020812 0%,#05101e 40%,#030a18 100%)",
-      minHeight:"100vh", fontFamily:"'Courier New',monospace",
-      color:"#8ab4d8", padding:"16px", position:"relative", overflow:"hidden",
-    },
-    panel: (theme="fluid") => ({
-      background: THEME[theme].bg,
-      border:`1px solid ${THEME[theme].border}`,
-      borderRadius:"8px", padding:"14px", marginBottom:"12px",
-      backdropFilter:"blur(8px)", position:"relative", zIndex:1,
-    }),
-    label: (color="#2a5a90") => ({
-      fontSize:"8px", letterSpacing:"0.35em", color,
-      textTransform:"uppercase", marginBottom:"10px", display:"block",
-    }),
-  };
-
-  const ModelBadge = ({idx})=>{
-    const t = THEME[MODEL_THEMES[idx]];
-    return (
-      <span style={{display:"inline-flex",alignItems:"center",gap:"4px",
-        background:`${t.primary}18`,border:`1px solid ${t.primary}44`,
-        borderRadius:"12px",padding:"2px 8px",fontSize:"8px",
-        color:t.primary,letterSpacing:"0.1em",fontWeight:"bold"}}>
-        {MODEL_LABELS[idx]}
-      </span>
-    );
-  };
-
-  // ─── BALL COMPONENT ──────────────────────────────────────────────────────────
-  const Ball = ({num, modelIdx, size=60, showRank=false, rank=0, freq, isMega=false})=>{
-    const t   = isMega ? THEME.gold : THEME[MODEL_THEMES[modelIdx]];
-    const sel = selectedBall?.modelIdx===modelIdx && selectedBall?.num===num;
-    return (
-      <div onClick={()=>setSelectedBall(sel?null:{modelIdx,num})}
-        style={{textAlign:"center",cursor:"pointer",userSelect:"none"}}>
-        {showRank&&<div style={{fontSize:"7px",color:"#1e3a50",marginBottom:"3px",letterSpacing:"0.1em"}}>
-          #{rank}
-        </div>}
-        <div style={{
-          width:`${size}px`,height:`${size}px`,borderRadius:"50%",
-          background:`radial-gradient(circle at 35% 35%,${isMega?"#1a0800":"#010610"},#010408)`,
-          border:`${sel?"3":"2"}px solid ${t.primary}`,
-          boxShadow:sel
-            ?`0 0 0 3px ${t.glow},0 0 25px ${t.glow},0 0 50px ${t.glow}`
-            :`0 0 15px ${t.glow},0 0 30px ${t.glow}88`,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:`${size*0.32}px`,fontWeight:"900",color:t.primary,
-          margin:"0 auto",transition:"all 0.2s",
-          animation:`ballGlow${modelIdx} 2.5s ease-in-out infinite`,
-        }}>{num}</div>
-        {freq!==undefined&&<div style={{fontSize:"6px",color:"#1a3050",marginTop:"2px"}}>{freq}×</div>}
-      </div>
-    );
-  };
-
-  // ─── RENDER ──────────────────────────────────────────────────────────────────
+function BallEl(props) {
+  var num=props.num, mi=props.mi, size=props.size||60, freq=props.freq;
+  var isMega=props.isMega||false, selected=props.selected||false;
+  var onClick=props.onClick, showRank=props.showRank||false, rank=props.rank||0;
+  var t = isMega ? TH.gold : TH[MK[mi]];
+  var sz = size;
   return (
-    <div style={S.root}>
-      <style>{`
-        @keyframes shimmer{0%{background-position:0% 50%}100%{background-position:300% 50%}}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        @keyframes flowIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes ballGlow0{0%,100%{box-shadow:0 0 15px rgba(0,229,255,0.35),0 0 30px rgba(0,229,255,0.2)}
-                              50%{box-shadow:0 0 22px rgba(0,229,255,0.7),0 0 44px rgba(0,229,255,0.35)}}
-        @keyframes ballGlow1{0%,100%{box-shadow:0 0 15px rgba(0,230,118,0.35),0 0 30px rgba(0,230,118,0.2)}
-                              50%{box-shadow:0 0 22px rgba(0,230,118,0.7),0 0 44px rgba(0,230,118,0.35)}}
-        @keyframes ballGlow2{0%,100%{box-shadow:0 0 15px rgba(224,64,251,0.35),0 0 30px rgba(224,64,251,0.2)}
-                              50%{box-shadow:0 0 22px rgba(224,64,251,0.7),0 0 44px rgba(224,64,251,0.35)}}
-        @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
-        @keyframes quantumFlicker{0%,100%{opacity:1}48%{opacity:0.95}50%{opacity:0.7}52%{opacity:0.95}}
-        .tab-s{animation:flowIn 0.3s ease}
-        .hover-lift:hover{transform:translateY(-2px);transition:transform 0.15s}
-        .q-flicker{animation:quantumFlicker 4s ease-in-out infinite}
-      `}</style>
+    <div onClick={onClick} style={{textAlign:"center",cursor:onClick?"pointer":"default",userSelect:"none"}}>
+      {showRank && <div style={{fontSize:"7px",color:"#1e3a50",marginBottom:"2px"}}>#{rank}</div>}
+      <div style={{
+        width:sz+"px", height:sz+"px", borderRadius:"50%",
+        background:"radial-gradient(circle at 35% 35%,"+(isMega?"#1a0800":"#010610")+",#010408)",
+        border:(selected?"3":"2")+"px solid "+t.p,
+        boxShadow:selected?"0 0 0 3px "+t.g+",0 0 25px "+t.g+",0 0 45px "+t.g
+                          :"0 0 14px "+t.g+",0 0 28px "+t.g+"66",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:Math.round(sz*0.32)+"px", fontWeight:"900", color:t.p,
+        margin:"0 auto", transition:"all 0.2s"
+      }}>{num}</div>
+      {freq != null && <div style={{fontSize:"6px",color:"#1a3050",marginTop:"2px"}}>{freq}x</div>}
+    </div>
+  );
+}
 
-      {/* scanline effect */}
-      <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,pointerEvents:"none",zIndex:0,overflow:"hidden"}}>
-        <div style={{position:"absolute",left:0,right:0,height:"2px",
-          background:"linear-gradient(transparent,rgba(0,150,255,0.04),transparent)",
-          animation:"scanline 8s linear infinite"}}/>
-        <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,
-          background:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,80,180,0.011) 2px,rgba(0,80,180,0.011) 4px)"}}/>
+function App() {
+  var ballState     = useState(BASE_BALL_DATA);
+  var balls         = ballState[0]; var setBalls = ballState[1];
+  var megaState     = useState(BASE_MEGA_DATA);
+  var mega          = megaState[0]; var setMega = megaState[1];
+  var statusState   = useState("loading");
+  var appStatus     = statusState[0]; var setAppStatus = statusState[1];
+  var infoState     = useState({newDraws:0,lastDate:BASELINE_DATE,total:BASE_DRAWS,error:null});
+  var info          = infoState[0]; var setInfo = infoState[1];
+  var refreshState  = useState(false);
+  var refreshing    = refreshState[0]; var setRefreshing = refreshState[1];
+  var tabState      = useState("compare");
+  var tab           = tabState[0]; var setTab = tabState[1];
+  var selState      = useState(null);
+  var sel           = selState[0]; var setSel = selState[1];
+  var evState       = useState(false);
+  var showEV        = evState[0]; var setShowEV = evState[1];
+  var tickState     = useState(0);
+  var tick          = tickState[0]; var setTick = tickState[1];
+
+  useEffect(function(){
+    var id = setInterval(function(){ setTick(function(t){return t+1;}); }, 2000);
+    return function(){ clearInterval(id); };
+  }, []);
+
+  function doFetch(isRefresh) {
+    if(isRefresh) setRefreshing(true);
+    fetchNewDrawings().then(function(nd){
+      if(nd.length > 0){
+        var merged = mergeDrawings(nd);
+        setBalls(merged.balls);
+        setMega(merged.mega);
+      }
+      var lastDate = nd.length>0 ? nd[nd.length-1].draw_date.substring(0,10) : BASELINE_DATE;
+      setInfo({newDraws:nd.length, lastDate:lastDate, total:BASE_DRAWS+nd.length, error:null});
+      setAppStatus("ready");
+      if(isRefresh) setRefreshing(false);
+    }).catch(function(e){
+      setInfo(function(prev){ return Object.assign({},prev,{error:e.message}); });
+      setAppStatus("ready");
+      if(isRefresh) setRefreshing(false);
+    });
+  }
+
+  useEffect(function(){ doFetch(false); }, []);
+
+  var fB = useMemo(function(){ return modelFluid(balls,70,5); }, [balls]);
+  var sB = useMemo(function(){ return modelSmart(balls,70,5,info.total); }, [balls,info.total]);
+  var qB = useMemo(function(){ return modelQuantum(balls,70,5); }, [balls]);
+  var fM = useMemo(function(){ return modelFluid(mega,24,1); }, [mega]);
+  var sM = useMemo(function(){ return modelSmart(mega,24,1,info.total); }, [mega,info.total]);
+  var qM = useMemo(function(){ return modelQuantum(mega,24,1); }, [mega]);
+
+  var preds = useMemo(function(){
+    var fTop=[...fB].sort(function(a,b){return b.score-a.score;});
+    var sTop=[...sB].sort(function(a,b){return b.score-a.score;});
+    var qTop=[...qB].sort(function(a,b){return b.score-a.score;});
+    return [
+      {main:fTop.slice(0,5).map(function(s){return s.num;}).sort(function(a,b){return a-b;}),
+       mega:[...fM].sort(function(a,b){return b.score-a.score;})[0].num},
+      {main:applyBalanceFilter(sTop),
+       mega:[...sM].sort(function(a,b){return b.score-a.score;})[0].num},
+      {main:qTop.slice(0,5).map(function(s){return s.num;}).sort(function(a,b){return a-b;}),
+       mega:[...qM].sort(function(a,b){return b.score-a.score;})[0].num}
+    ];
+  }, [fB,sB,qB,fM,sM,qM]);
+
+  var allS = [fB,sB,qB];
+  var allM = [fM,sM,qM];
+
+  if(appStatus==="loading"){
+    return (
+      <div style={{background:"#020812",minHeight:"100vh",display:"flex",flexDirection:"column",
+        alignItems:"center",justifyContent:"center",fontFamily:"'Courier New',monospace"}}>
+        <div style={{fontSize:"16px",fontWeight:"900",color:"#00b8ff",marginBottom:"12px",letterSpacing:"0.15em"}}>
+          Loading...
+        </div>
       </div>
+    );
+  }
 
-      {/* ══ HEADER ════════════════════════════════════════════════════════════ */}
-      <div style={{textAlign:"center",marginBottom:"16px",position:"relative",zIndex:1}}>
-        <div style={{fontSize:"clamp(13px,3vw,22px)",fontWeight:"900",letterSpacing:"0.18em",textTransform:"uppercase",
+  var dotColor = info.error ? "#ff6b35" : info.newDraws>0 ? "#00e676" : "#448aff";
+  var dotMsg   = info.error ? "API ERROR - BASELINE"
+               : info.newDraws>0 ? info.newDraws+" NEW DRAW"+(info.newDraws>1?"S":"")+" LIVE"
+               : "LIVE - UP TO DATE";
+
+  return (
+    <div style={{background:"linear-gradient(160deg,#020812,#04101e 50%,#030a18)",
+      minHeight:"100vh",fontFamily:"'Courier New',monospace",color:"#8ab4d8",
+      padding:"14px 14px 56px",position:"relative"}}>
+
+      {/* Header */}
+      <div style={{textAlign:"center",marginBottom:"14px"}}>
+        <div style={{fontSize:"clamp(13px,3vw,20px)",fontWeight:"900",letterSpacing:"0.17em",
+          textTransform:"uppercase",
           background:"linear-gradient(90deg,#00e5ff,#00e676,#e040fb,#00e5ff)",
           backgroundSize:"300% 100%",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
           animation:"shimmer 5s linear infinite"}}>
-          ⚡ MEGA MILLIONS · TRI-MODEL PREDICTION SYSTEM ⚡
+          &#9889; MEGA MILLIONS - TRI-MODEL SYSTEM &#9889;
         </div>
-        <div style={{fontSize:"8px",color:"#2a4a6a",letterSpacing:"0.25em",marginTop:"4px"}}>
-          THREE INDEPENDENT MODELS · {TOTAL_DRAWS.toLocaleString()} DRAWS · SEP 1996 → APR 2026
+        <div style={{fontSize:"8px",color:"#2a4a6a",letterSpacing:"0.15em",marginTop:"4px"}}>
+          3 MODELS - {info.total.toLocaleString()} DRAWS - SEP 1996 to {info.lastDate}
+          {info.newDraws>0 && <span style={{color:"#00e676"}}> - +{info.newDraws} LIVE</span>}
         </div>
 
-        {/* Model legend badges */}
-        <div style={{display:"flex",justifyContent:"center",gap:"8px",marginTop:"8px",flexWrap:"wrap"}}>
-          {[0,1,2].map(i=>(
-            <div key={i} style={{background:THEME[MODEL_THEMES[i]].bg,
-              border:`1px solid ${THEME[MODEL_THEMES[i]].border}`,
-              borderRadius:"16px",padding:"4px 12px",textAlign:"center",minWidth:"140px"}}>
-              <div style={{fontSize:"9px",color:THEME[MODEL_THEMES[i]].primary,fontWeight:"bold",letterSpacing:"0.1em"}}>
-                {MODEL_LABELS[i]}
+        <div style={{display:"flex",justifyContent:"center",gap:"7px",marginTop:"8px",flexWrap:"wrap"}}>
+          {[0,1,2].map(function(i){
+            return (
+              <div key={i} style={{background:TH[MK[i]].bg,border:"1px solid "+TH[MK[i]].br,
+                borderRadius:"14px",padding:"4px 11px",textAlign:"center",minWidth:"110px"}}>
+                <div style={{fontSize:"9px",color:TH[MK[i]].p,fontWeight:"bold",letterSpacing:"0.08em"}}>{ML[i]}</div>
+                <div style={{fontSize:"7px",color:"#1e3a50",marginTop:"1px"}}>{MS[i]}</div>
               </div>
-              <div style={{fontSize:"7px",color:"#1e3a50",marginTop:"1px"}}>{MODEL_SUBTITLES[i]}</div>
-            </div>
-          ))}
-
-          {/* EV badge */}
-          <div onClick={()=>setShowEV(!showEV)} style={{
-            background:evPositive?"rgba(0,50,20,0.7)":"rgba(50,10,0,0.7)",
-            border:`1px solid ${evPositive?"rgba(0,200,100,0.3)":"rgba(200,50,0,0.3)"}`,
-            borderRadius:"16px",padding:"4px 12px",textAlign:"center",cursor:"pointer",minWidth:"120px"}}>
-            <div style={{fontSize:"9px",color:evPositive?"#00e676":"#ff6b35",fontWeight:"bold"}}>
-              {evPositive?"✓ EV POSITIVE":"✗ EV NEGATIVE"}
-            </div>
-            <div style={{fontSize:"7px",color:"#1e3a50",marginTop:"1px"}}>
-              ${JACKPOT_M}M jackpot · click
-            </div>
+            );
+          })}
+          <div onClick={function(){setShowEV(!showEV);}} style={{
+            background:"rgba(50,10,0,0.7)",border:"1px solid rgba(200,50,0,0.3)",
+            borderRadius:"14px",padding:"4px 11px",textAlign:"center",cursor:"pointer",minWidth:"100px"}}>
+            <div style={{fontSize:"9px",color:"#ff6b35",fontWeight:"bold"}}>EV NEGATIVE</div>
+            <div style={{fontSize:"7px",color:"#1e3a50",marginTop:"1px"}}>$163M - tap</div>
           </div>
         </div>
 
-        {/* EV detail panel */}
         {showEV && (
-          <div style={{...S.panel(evPositive?"smart":"fluid"),maxWidth:"440px",margin:"8px auto 0",
-            animation:"flowIn 0.25s ease",textAlign:"left"}}>
-            <span style={S.label(evPositive?"#00e676":"#ff6b35")}>· Expected Value Analysis ·</span>
-            {[
-              ["Jackpot",              `$${JACKPOT_M}M`],
-              ["Lump sum (60%)",       `$${(JACKPOT_M*0.6).toFixed(1)}M`],
-              ["After 37% tax (63%)",  `$${(JACKPOT_M*0.6*0.63).toFixed(1)}M`],
-              ["Odds",                 "1 in 302,575,350"],
-              ["EV per $2 ticket",     `$${(jackpotEV).toFixed(4)}`],
-              ["Net EV",               `${netEV>=0?"+":""}$${netEV.toFixed(4)}`],
-              ["Break-even jackpot",   "~$700M"],
-            ].map(([k,v])=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",
-                padding:"2px 0",borderBottom:"1px solid rgba(0,100,200,0.1)"}}>
-                <span style={{fontSize:"9px",color:"#2a5070"}}>{k}</span>
-                <span style={{fontSize:"9px",color:k==="Net EV"?(netEV>=0?"#00e676":"#ff6b35"):"#82b1ff"}}>{v}</span>
-              </div>
-            ))}
+          <div style={{...mkPanel("fluid"),maxWidth:"400px",margin:"8px auto 0",animation:"flowIn 0.25s ease",textAlign:"left"}}>
+            <span style={mkLbl("#ff6b35")}>Expected Value - $163M Jackpot</span>
+            {[["Lump sum 60%","$97.8M"],["After tax 63%","$61.6M"],["Odds","1 in 302,575,350"],
+              ["EV per $2 ticket","$0.204"],["Net EV","-$1.796"],["Break-even","~$700M"]
+            ].map(function(row){
+              var k=row[0],v=row[1];
+              return (
+                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"2px 0",borderBottom:"1px solid rgba(0,100,200,0.1)"}}>
+                  <span style={{fontSize:"9px",color:"#2a5070"}}>{k}</span>
+                  <span style={{fontSize:"9px",color:k==="Net EV"?"#ff6b35":"#82b1ff"}}>{v}</span>
+                </div>
+              );
+            })}
             <div style={{marginTop:"6px",fontSize:"8px",color:"#1a3050",lineHeight:1.7}}>
-              {evPositive
-                ? "✓ Jackpot exceeds break-even threshold. Mathematically the least-bad time to buy."
-                : `✗ Jackpot needs to reach ~$700M for positive EV. Current: $${JACKPOT_M}M. Still fun though.`}
+              Needs ~$700M for positive EV. Still fun though.
             </div>
           </div>
         )}
 
-        <div style={{fontSize:"7px",color:"#0c1d2e",marginTop:"6px",letterSpacing:"0.15em"}}>
-          ⚠ ENTERTAINMENT ONLY · EACH DRAW IS STATISTICALLY INDEPENDENT · 1-IN-302,575,350 ODDS
+        <div style={{fontSize:"7px",color:"#0c1d2e",marginTop:"6px",letterSpacing:"0.1em"}}>
+          ENTERTAINMENT ONLY - STATISTICALLY INDEPENDENT DRAWS - 1-IN-302,575,350 ODDS
         </div>
       </div>
 
-      {/* ══ TABS ══════════════════════════════════════════════════════════════ */}
-      <div style={{display:"flex",gap:"6px",justifyContent:"center",marginBottom:"14px",
-                   position:"relative",zIndex:1,flexWrap:"wrap"}}>
-        {["compare","fluid","smart","quantum"].map((t,i)=>{
-          const active = activeTab===t;
-          const themeKey = i===0?"fluid":MODEL_THEMES[i-1];
-          const color = active ? THEME[themeKey].primary : "#2a4a6a";
+      {/* Tabs */}
+      <div style={{display:"flex",gap:"5px",justifyContent:"center",marginBottom:"12px",flexWrap:"wrap"}}>
+        {[["compare","Compare","fluid"],["fluid","Fluid","fluid"],["smart","Smart","smart"],["quantum","Quantum","quantum"]].map(function(row){
+          var id=row[0],label=row[1],tk=row[2];
           return (
-            <button key={t} onClick={()=>setActiveTab(t)} style={{
-              padding:"6px 14px",fontSize:"9px",letterSpacing:"0.2em",textTransform:"uppercase",
-              background:active?`${THEME[themeKey].primary}18`:"transparent",
-              border:active?`1px solid ${THEME[themeKey].primary}99`:"1px solid rgba(0,80,150,0.25)",
-              color,borderRadius:"4px",cursor:"pointer",transition:"all 0.2s",
-            }}>{i===0?"⊞ Compare":MODEL_LABELS[i-1]}</button>
+            <button key={id} onClick={function(){setTab(id);}} style={{
+              padding:"6px 11px",fontSize:"9px",letterSpacing:"0.1em",textTransform:"uppercase",
+              background:tab===id ? TH[tk].p+"18" : "transparent",
+              border:tab===id ? "1px solid "+TH[tk].p : "1px solid rgba(0,80,150,0.25)",
+              color:tab===id ? TH[tk].p : "#2a4a6a",
+              borderRadius:"4px",cursor:"pointer",fontFamily:"inherit",transition:"all 0.2s"
+            }}>{label}</button>
           );
         })}
       </div>
 
-      {/* ══════════════════════════ COMPARE TAB ═══════════════════════════════ */}
-      {activeTab==="compare" && (
-        <div className="tab-s" style={{position:"relative",zIndex:1}}>
-
-          {/* Three columns side by side */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px",marginBottom:"14px"}}>
-            {[0,1,2].map(mi=>{
-              const t   = THEME[MODEL_THEMES[mi]];
-              const p   = predictions[mi];
-              const scores = allScores[mi];
-              const mb  = allMB[mi].find(s=>s.num===p.mega);
+      {/* Compare Tab */}
+      {tab==="compare" && (
+        <div className="ts">
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"9px",marginBottom:"10px"}}>
+            {[0,1,2].map(function(mi){
+              var t=TH[MK[mi]], p=preds[mi], sc2=allS[mi];
+              var mbScore = allM[mi].filter(function(s){return s.num===p.mega;})[0];
               return (
-                <div key={mi} style={{...S.panel(MODEL_THEMES[mi]),textAlign:"center"}}>
-                  <div style={{fontSize:"9px",color:t.primary,fontWeight:"bold",
-                    letterSpacing:"0.15em",marginBottom:"2px"}}>{MODEL_LABELS[mi]}</div>
-                  <div style={{fontSize:"7px",color:"#1e3a50",marginBottom:"12px",lineHeight:1.5}}>
-                    {MODEL_SUBTITLES[mi]}
+                <div key={mi} style={{...mkPanel(MK[mi]),textAlign:"center"}}>
+                  <div style={{fontSize:"9px",color:t.p,fontWeight:"bold",marginBottom:"2px"}}>{ML[mi]}</div>
+                  <div style={{fontSize:"7px",color:"#1e3a50",marginBottom:"10px",lineHeight:1.4}}>{MS[mi]}</div>
+                  <div style={{display:"flex",justifyContent:"center",gap:"4px",flexWrap:"wrap",marginBottom:"9px"}}>
+                    {p.main.map(function(n){
+                      var s=sc2.filter(function(x){return x.num===n;})[0];
+                      return <BallEl key={n} num={n} mi={mi} size={44} freq={s&&s.freq}/>;
+                    })}
                   </div>
-
-                  {/* 5 main balls */}
-                  <div style={{display:"flex",justifyContent:"center",gap:"6px",
-                    flexWrap:"wrap",marginBottom:"10px"}}>
-                    {p.main.map(n=>(
-                      <Ball key={n} num={n} modelIdx={mi} size={48}
-                        freq={scores.find(s=>s.num===n)?.freq}/>
-                    ))}
+                  <div style={{borderTop:"1px solid "+t.br,paddingTop:"7px",marginBottom:"7px"}}>
+                    <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"3px"}}>MEGA BALL</div>
+                    <BallEl num={p.mega} mi={mi} isMega={true} size={40} freq={mbScore&&mbScore.freq}/>
                   </div>
-
-                  {/* Mega ball */}
-                  <div style={{borderTop:`1px solid ${t.border}`,paddingTop:"8px",marginBottom:"8px"}}>
-                    <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"4px",letterSpacing:"0.15em"}}>MEGA BALL</div>
-                    <Ball num={p.mega} modelIdx={mi} isMega={true} size={44}
-                      freq={mb?.freq}/>
-                  </div>
-
-                  {/* Score line */}
-                  <div style={{fontSize:"8px",color:t.primary,letterSpacing:"0.1em",
-                    fontWeight:"bold",borderTop:`1px solid ${t.border}`,paddingTop:"6px"}}>
-                    {p.main.join(" · ")} + MB{p.mega}
+                  <div style={{fontSize:"8px",color:t.p,fontWeight:"bold",borderTop:"1px solid "+t.br,paddingTop:"5px"}}>
+                    {p.main.join(" - ")} + MB{p.mega}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Consensus panel — numbers appearing in multiple models */}
-          {(()=>{
-            const countMap={};
-            predictions.forEach(p=> p.main.forEach(n=>{ countMap[n]=(countMap[n]||0)+1; }));
-            const consensus = Object.entries(countMap).filter(([,c])=>c>=2).map(([n,c])=>({n:+n,c})).sort((a,b)=>b.c-a.c);
-            const mbCount={};
-            predictions.forEach(p=>{ mbCount[p.mega]=(mbCount[p.mega]||0)+1; });
-            const topMB = Object.entries(mbCount).sort((a,b)=>b[1]-a[1])[0];
+          {(function(){
+            var cm={};
+            preds.forEach(function(p){ p.main.forEach(function(n){ cm[n]=(cm[n]||0)+1; }); });
+            var cons=Object.entries(cm).filter(function(e){return e[1]>=2;}).map(function(e){return {n:+e[0],c:e[1]};}).sort(function(a,b){return b.c-a.c;});
+            var mbm={};
+            preds.forEach(function(p){ mbm[p.mega]=(mbm[p.mega]||0)+1; });
+            var topMB=Object.entries(mbm).sort(function(a,b){return b[1]-a[1];})[0];
             return (
-              <div style={{...S.panel("fluid"),background:"rgba(10,20,40,0.8)",
-                border:"1px solid rgba(255,200,0,0.2)"}}>
-                <span style={S.label("#ffd600")}>· Consensus — Numbers Appearing in 2+ Models ·</span>
-                {consensus.length===0 ? (
+              <div style={{...mkPanel("fluid"),background:"rgba(8,16,36,0.9)",border:"1px solid rgba(255,200,0,0.18)"}}>
+                <span style={mkLbl("#ffd600")}>Consensus - Numbers in 2+ Models</span>
+                {cons.length===0 ? (
                   <div style={{fontSize:"9px",color:"#1e4060",textAlign:"center",padding:"8px 0"}}>
-                    No overlapping numbers — models diverge completely on this draw
+                    Models diverge - no overlapping numbers
                   </div>
                 ) : (
-                  <div style={{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"center"}}>
-                    {consensus.map(({n,c})=>(
-                      <div key={n} style={{textAlign:"center"}}>
-                        <div style={{width:"44px",height:"44px",borderRadius:"50%",
-                          background:"radial-gradient(circle at 35% 35%,#1a1400,#040408)",
-                          border:`2px solid #ffd600`,
-                          boxShadow:`0 0 16px rgba(255,214,0,0.5)`,
-                          display:"flex",alignItems:"center",justifyContent:"center",
-                          fontSize:"16px",fontWeight:"900",color:"#ffd600",margin:"0 auto"}}>
-                          {n}
+                  <div style={{display:"flex",gap:"9px",flexWrap:"wrap",alignItems:"center"}}>
+                    {cons.map(function(obj){
+                      return (
+                        <div key={obj.n} style={{textAlign:"center"}}>
+                          <div style={{width:"42px",height:"42px",borderRadius:"50%",
+                            background:"radial-gradient(circle at 35% 35%,#1a1400,#040408)",
+                            border:"2px solid #ffd600",boxShadow:"0 0 14px rgba(255,214,0,0.5)",
+                            display:"flex",alignItems:"center",justifyContent:"center",
+                            fontSize:"15px",fontWeight:"900",color:"#ffd600",margin:"0 auto"}}>{obj.n}</div>
+                          <div style={{fontSize:"7px",color:"#3a2800",marginTop:"2px"}}>{obj.c===3?"ALL 3":"2 of 3"}</div>
                         </div>
-                        <div style={{fontSize:"7px",color:"#3a2800",marginTop:"2px"}}>
-                          {c===3?"★ ALL 3":"2 of 3"}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {topMB[1]>=2 && (
-                      <div style={{textAlign:"center",marginLeft:"10px",
-                        borderLeft:"1px solid rgba(255,214,0,0.2)",paddingLeft:"10px"}}>
-                        <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"3px"}}>CONSENSUS MB</div>
-                        <div style={{width:"44px",height:"44px",borderRadius:"50%",
+                      <div style={{textAlign:"center",marginLeft:"8px",borderLeft:"1px solid rgba(255,214,0,0.18)",paddingLeft:"8px"}}>
+                        <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"2px"}}>CONSENSUS MB</div>
+                        <div style={{width:"42px",height:"42px",borderRadius:"50%",
                           background:"radial-gradient(circle at 35% 35%,#2a1400,#040408)",
-                          border:"2px solid #ffd600",
-                          boxShadow:"0 0 16px rgba(255,214,0,0.6)",
+                          border:"2px solid #ffd600",boxShadow:"0 0 14px rgba(255,214,0,0.55)",
                           display:"flex",alignItems:"center",justifyContent:"center",
-                          fontSize:"16px",fontWeight:"900",color:"#ffd600",margin:"0 auto"}}>
-                          {topMB[0]}
-                        </div>
-                        <div style={{fontSize:"7px",color:"#3a2000",marginTop:"2px"}}>
-                          {topMB[1]} of 3 models
-                        </div>
+                          fontSize:"15px",fontWeight:"900",color:"#ffd600",margin:"0 auto"}}>{topMB[0]}</div>
+                        <div style={{fontSize:"7px",color:"#3a2000",marginTop:"2px"}}>{topMB[1]} of 3</div>
                       </div>
                     )}
                   </div>
@@ -608,477 +487,427 @@ function TriModelPredictor() {
               </div>
             );
           })()}
+        </div>
+      )}
 
-          {/* Mini model explanation strip */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px"}}>
-            {[
-              {mi:0,key:"fluid",   lines:["P = fᵢ/f̄ (pressure)","v = recency (velocity)","Re = ρvL/μ (Reynolds)","F = 0.38v+0.30P+0.18/ω"]},
-              {mi:1,key:"smart",   lines:["E = ½k(ago-T)² (spring)","Unpopularity = 1/bias","Balance: sum 100-175","2-3 odd/even, 2-3 low/high"]},
-              {mi:2,key:"quantum", lines:["ψ = √(f/N)·e^(iθ) (wave)","P = |ψ|²·interference","P_tunnel = e^(-κ·barrier)","Entanglement pair boost"]},
-            ].map(({mi,key,lines})=>{
-              const t=THEME[MODEL_THEMES[mi]];
-              return (
-                <div key={mi} style={{...S.panel(key),fontSize:"8px"}}>
-                  <span style={S.label(t.secondary)}>{MODEL_LABELS[mi]} · Core Equations</span>
-                  {lines.map(l=><div key={l} style={{color:t.primary,opacity:0.7,marginBottom:"3px",
-                    fontStyle:"italic",letterSpacing:"0.05em"}}>{l}</div>)}
-                </div>
-              );
-            })}
+      {/* Fluid Tab */}
+      {tab==="fluid" && (
+        <div className="ts">
+          <FluidDetail scores={fB} mbScores={fM} pred={preds[0]} sel={sel} setSel={setSel}/>
+        </div>
+      )}
+
+      {/* Smart Tab */}
+      {tab==="smart" && (
+        <div className="ts">
+          <SmartDetail scores={sB} mbScores={sM} pred={preds[1]} sel={sel} setSel={setSel}/>
+        </div>
+      )}
+
+      {/* Quantum Tab */}
+      {tab==="quantum" && (
+        <div className="ts">
+          <QuantumDetail scores={qB} mbScores={qM} pred={preds[2]} sel={sel} setSel={setSel}/>
+        </div>
+      )}
+
+      {/* Status bar */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,
+        background:"rgba(1,4,12,0.97)",borderTop:"1px solid rgba(0,120,255,0.1)",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"5px 14px",flexWrap:"wrap",gap:"6px"}}>
+        <div style={{display:"flex",gap:"12px",flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"5px"}}>
+            <div style={{width:"6px",height:"6px",borderRadius:"50%",background:dotColor,
+              boxShadow:"0 0 6px "+dotColor,animation:"pulse 2s ease-in-out infinite"}}/>
+            <span style={{fontSize:"8px",color:dotColor}}>{dotMsg}</span>
           </div>
+          <span style={{fontSize:"7px",color:"#1a3050"}}>LATEST: {info.lastDate}</span>
+          <span style={{fontSize:"7px",color:"#1a3050"}}>{info.total.toLocaleString()} DRAWS</span>
+          <span style={{fontSize:"6px",color:"#0c1a28"}}>NY OPEN DATA - TICK {tick}</span>
         </div>
-      )}
-
-      {/* ══════════════════════════ FLUID TAB ═════════════════════════════════ */}
-      {activeTab==="fluid" && (
-        <div className="tab-s" style={{position:"relative",zIndex:1}}>
-          <ModelDetailView
-            modelIdx={0} scores={fluidBalls} mbScores={fluidMB}
-            prediction={predictions[0]} S={S} Ball={Ball}
-            selectedBall={selectedBall} setSelectedBall={setSelectedBall}
-            title="Navier-Stokes Fluid Dynamics Model"
-            desc="Treats each ball's draw history as a fluid flow field. Pressure = frequency weight, Velocity = recency, Reynolds number determines turbulence regime."
-          />
-        </div>
-      )}
-
-      {/* ══════════════════════════ SMART TAB ════════════════════════════════ */}
-      {activeTab==="smart" && (
-        <div className="tab-s" style={{position:"relative",zIndex:1}}>
-          <SmartModelView
-            scores={smartBalls} mbScores={smartMB}
-            prediction={predictions[1]} S={S} Ball={Ball}
-            selectedBall={selectedBall} setSelectedBall={setSelectedBall}
-          />
-        </div>
-      )}
-
-      {/* ══════════════════════════ QUANTUM TAB ══════════════════════════════ */}
-      {activeTab==="quantum" && (
-        <div className="tab-s" style={{position:"relative",zIndex:1}}>
-          <QuantumModelView
-            scores={quantumBalls} mbScores={quantumMB}
-            prediction={predictions[2]} S={S} Ball={Ball}
-            selectedBall={selectedBall} setSelectedBall={setSelectedBall}
-          />
-        </div>
-      )}
-
-      {/* ══ STATUS BAR ════════════════════════════════════════════════════════ */}
-      <div style={{marginTop:"12px",textAlign:"center",fontSize:"7px",color:"#0c1c2e",
-                   letterSpacing:"0.2em",position:"relative",zIndex:1}}>
-        DATA: LOTTOAMERICA.COM · {TOTAL_DRAWS.toLocaleString()} DRAWS · SEP 1996→APR 2026 ·
-        MODELS: NS-FLUID | SMART-PLAY | QUANTUM-ENTANGLEMENT · TICK {tick}
+        <button onClick={function(){doFetch(true);}} disabled={refreshing} style={{
+          padding:"5px 16px",fontSize:"8px",letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:"inherit",
+          background:refreshing?"rgba(0,50,100,0.1)":"rgba(0,180,255,0.12)",
+          border:refreshing?"1px solid rgba(0,80,160,0.2)":"1px solid rgba(0,200,255,0.55)",
+          color:refreshing?"#1e4060":"#00e5ff",
+          borderRadius:"4px",cursor:refreshing?"not-allowed":"pointer",
+          transition:"all 0.2s",display:"flex",alignItems:"center",gap:"5px"}}>
+          <span style={{display:"inline-block",fontSize:"12px",
+            animation:refreshing?"spin 0.8s linear infinite":"none"}}>&#8635;</span>
+          {refreshing ? "UPDATING..." : "REFRESH DRAWS"}
+        </button>
       </div>
     </div>
   );
 }
 
-// ─── MODEL DETAIL VIEW (reused for fluid tab) ─────────────────────────────────
-function ModelDetailView({modelIdx,scores,mbScores,prediction,S,Ball,selectedBall,setSelectedBall,title,desc}) {
-  const t = THEME[MODEL_THEMES[modelIdx]];
-  const sorted = [...scores].sort((a,b)=>b.score-a.score);
-  const maxS = sorted[0].score;
-  const predSet = new Set(prediction.main);
-  const detailBall = selectedBall?.modelIdx===modelIdx
-    ? scores.find(s=>s.num===selectedBall.num) : null;
-
+function FluidDetail(props) {
+  var scores=props.scores, mbScores=props.mbScores, pred=props.pred, sel=props.sel, setSel=props.setSel;
+  var t = TH.fluid;
+  var sorted = [...scores].sort(function(a,b){return b.score-a.score;});
+  var maxS = sorted[0].score;
+  var predSet = {};
+  pred.main.forEach(function(n){predSet[n]=true;});
+  var det = (sel && sel.mi===0) ? scores.filter(function(s){return s.num===sel.num;})[0] : null;
   return (
-    <>
-      <div style={{...S.panel(MODEL_THEMES[modelIdx]),textAlign:"center",marginBottom:"10px"}}>
-        <span style={S.label(t.primary)}>· {title} ·</span>
-        <div style={{fontSize:"8px",color:"#1e4060",marginBottom:"16px",maxWidth:"600px",margin:"0 auto 16px",lineHeight:1.8}}>{desc}</div>
-
-        {/* Balls */}
-        <div style={{display:"flex",justifyContent:"center",gap:"14px",flexWrap:"wrap",marginBottom:"16px",alignItems:"flex-end"}}>
-          {prediction.main.map((n,i)=>{
-            const s=scores.find(x=>x.num===n);
-            return <Ball key={n} num={n} modelIdx={modelIdx} size={66}
-              showRank rank={sorted.findIndex(x=>x.num===n)+1} freq={s?.freq}/>;
+    <div>
+      <div style={{...mkPanel("fluid"),textAlign:"center"}}>
+        <span style={mkLbl(t.p)}>Navier-Stokes Fluid Dynamics</span>
+        <div style={{display:"flex",justifyContent:"center",gap:"11px",flexWrap:"wrap",marginBottom:"12px",alignItems:"flex-end"}}>
+          {pred.main.map(function(n){
+            var s=scores.filter(function(x){return x.num===n;})[0];
+            var rank=sorted.findIndex(function(x){return x.num===n;})+1;
+            return (
+              <BallEl key={n} num={n} mi={0} size={62} showRank={true} rank={rank} freq={s&&s.freq}
+                selected={sel&&sel.mi===0&&sel.num===n}
+                onClick={function(){setSel(sel&&sel.num===n&&sel.mi===0?null:{mi:0,num:n});}}/>
+            );
           })}
-          <div style={{borderLeft:`1px solid ${t.border}`,paddingLeft:"14px",marginLeft:"4px"}}>
-            <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"4px"}}>MEGA BALL</div>
-            <Ball num={prediction.mega} modelIdx={modelIdx} isMega size={66}
-              freq={mbScores.find(s=>s.num===prediction.mega)?.freq}/>
+          <div style={{borderLeft:"1px solid "+t.br,paddingLeft:"11px",marginLeft:"3px"}}>
+            <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"3px"}}>MEGA BALL</div>
+            <BallEl num={pred.mega} mi={0} isMega={true} size={62}
+              freq={(mbScores.filter(function(s){return s.num===pred.mega;})[0]||{}).freq}/>
           </div>
         </div>
-        <div style={{fontSize:"11px",color:t.primary,letterSpacing:"0.15em",fontWeight:"bold"}}>
-          {prediction.main.join("  ·  ")} + MB {prediction.mega}
+        <div style={{fontSize:"11px",color:t.p,letterSpacing:"0.12em",fontWeight:"bold"}}>
+          {pred.main.join("  -  ")} + MB {pred.mega}
         </div>
       </div>
-
-      {/* Top 15 bar chart */}
-      <div style={S.panel(MODEL_THEMES[modelIdx])}>
-        <span style={S.label(t.secondary)}>· Top 15 by Score · Click any ball above for details ·</span>
-        {sorted.slice(0,15).map((s,i)=>{
-          const pct=(s.score/maxS)*100;
+      <div style={mkPanel("fluid")}>
+        <span style={mkLbl(t.s)}>Top 15 - tap to inspect</span>
+        {sorted.slice(0,15).map(function(s,i){
+          var pct=(s.score/maxS)*100;
           return (
-            <div key={s.num} onClick={()=>setSelectedBall({modelIdx,num:s.num})}
-              style={{marginBottom:"5px",display:"flex",alignItems:"center",gap:"7px",cursor:"pointer"}}>
+            <div key={s.num} onClick={function(){setSel(sel&&sel.num===s.num&&sel.mi===0?null:{mi:0,num:s.num});}}
+              style={{marginBottom:"5px",display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}>
               <div style={{width:"18px",fontSize:"7px",color:"#1e4060",textAlign:"right"}}>#{i+1}</div>
-              <div style={{width:"22px",fontSize:"10px",color:predSet.has(s.num)?"#fff":t.primary,
-                fontWeight:"bold",textAlign:"center"}}>{s.num}</div>
+              <div style={{width:"22px",fontSize:"10px",fontWeight:"bold",textAlign:"center",
+                color:predSet[s.num]?"#fff":t.p}}>{s.num}</div>
               <div style={{flex:1,height:"6px",background:"rgba(0,20,50,0.8)",borderRadius:"3px",overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${pct}%`,
-                  background:`linear-gradient(90deg,${t.primary}55,${t.primary})`,borderRadius:"3px"}}/>
+                <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,"+t.p+"55,"+t.p+")",borderRadius:"3px"}}/>
               </div>
-              <div style={{width:"44px",fontSize:"8px",color:"#2a5070",textAlign:"right"}}>
-                {s.score.toFixed(3)}</div>
-              <div style={{width:"8px",fontSize:"8px",textAlign:"center",color:"#ffd600"}}>
-                {predSet.has(s.num)?"★":""}</div>
+              <div style={{width:"42px",fontSize:"8px",color:"#2a5070",textAlign:"right"}}>{s.score.toFixed(3)}</div>
+              <div style={{width:"8px",fontSize:"8px",color:"#ffd600"}}>{predSet[s.num]?"*":""}</div>
             </div>
           );
         })}
       </div>
-
-      {/* Detail card for selected ball */}
-      {detailBall && (
-        <div style={{...S.panel(MODEL_THEMES[modelIdx]),animation:"flowIn 0.25s ease"}}>
-          <span style={S.label(t.primary)}>· Ball {detailBall.num} · Full Metrics ·</span>
-          <div style={{display:"flex",flexWrap:"wrap",gap:"20px"}}>
-            <div style={{textAlign:"center",minWidth:"70px"}}>
-              <div style={{fontSize:"32px",fontWeight:"900",color:t.primary}}>{detailBall.num}</div>
-              <div style={{fontSize:"7px",color:"#1e4060"}}>{detailBall.freq} draws</div>
-              {detailBall.regime&&<div style={{fontSize:"7px",color:detailBall.regime==="turbulent"?"#ff3333":detailBall.regime==="transitional"?"#ff8c00":"#00e676",
-                marginTop:"2px",letterSpacing:"0.1em"}}>{detailBall.regime?.toUpperCase()}</div>}
-              {detailBall.state&&<div style={{fontSize:"7px",color:t.primary,marginTop:"2px",
-                letterSpacing:"0.1em"}}>{detailBall.state}</div>}
-            </div>
-            <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 20px"}}>
-              {detailBall.metrics?.map(([k,v])=>(
-                <div key={k}>
-                  <div style={{fontSize:"7px",color:"#1e4060",letterSpacing:"0.15em"}}>{k.toUpperCase()}</div>
-                  <div style={{fontSize:"12px",color:t.primary}}>{v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-// ─── SMART MODEL VIEW ─────────────────────────────────────────────────────────
-function SmartModelView({scores,mbScores,prediction,S,Ball,selectedBall,setSelectedBall}) {
-  const t = THEME.smart;
-  const sorted = [...scores].sort((a,b)=>b.score-a.score);
-  const maxS = sorted[0].score;
-  const predSet = new Set(prediction.main);
-  const detailBall = selectedBall?.modelIdx===1
-    ? scores.find(s=>s.num===selectedBall.num) : null;
-
-  // Balance check on selected combo
-  const comboSum  = prediction.main.reduce((a,b)=>a+b,0);
-  const comboOdds = prediction.main.filter(n=>n%2!==0).length;
-  const comboLows = prediction.main.filter(n=>n<=35).length;
-  const sumOK = comboSum>=100&&comboSum<=175, oddOK=comboOdds>=2&&comboOdds<=3, lowOK=comboLows>=2&&comboLows<=3;
-
-  return (
-    <>
-      <div style={{...S.panel("smart"),textAlign:"center"}}>
-        <span style={S.label(t.primary)}>· Smart Play Model · Spring Pressure + Split Avoidance + Balance Filter ·</span>
-
-        <div style={{display:"flex",justifyContent:"center",gap:"14px",flexWrap:"wrap",marginBottom:"16px",alignItems:"flex-end"}}>
-          {prediction.main.map(n=>{
-            const s=scores.find(x=>x.num===n);
-            return (
-              <div key={n} style={{textAlign:"center"}}>
-                <Ball num={n} modelIdx={1} size={66}
-                  showRank rank={sorted.findIndex(x=>x.num===n)+1} freq={s?.freq}/>
-                <div style={{fontSize:"7px",marginTop:"3px",
-                  color:s?.pop>1.5?"#ff6b35":s?.pop>1.2?"#ffb347":"#00e676"}}>
-                  {s?.tag}
-                </div>
-              </div>
-            );
-          })}
-          <div style={{borderLeft:`1px solid ${t.border}`,paddingLeft:"14px",marginLeft:"4px"}}>
-            <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"4px"}}>MEGA BALL</div>
-            <Ball num={prediction.mega} modelIdx={1} isMega size={66}
-              freq={mbScores.find(s=>s.num===prediction.mega)?.freq}/>
-          </div>
-        </div>
-
-        {/* Balance check */}
-        <div style={{display:"inline-flex",gap:"12px",background:"rgba(0,30,15,0.6)",
-          border:"1px solid rgba(0,200,100,0.2)",borderRadius:"8px",padding:"8px 16px",
-          flexWrap:"wrap",justifyContent:"center",marginBottom:"10px"}}>
-          <span style={{fontSize:"7px",color:"#1e4060",letterSpacing:"0.1em",alignSelf:"center"}}>
-            BALANCE CHECK
-          </span>
-          {[
-            [`Sum: ${comboSum}`,sumOK,"100-175"],
-            [`Odd/Even: ${comboOdds}/${5-comboOdds}`,oddOK,"2-3 odd"],
-            [`Low/High: ${comboLows}/${5-comboLows}`,lowOK,"2-3 low (≤35)"],
-          ].map(([label,pass,rule])=>(
-            <div key={label} style={{textAlign:"center"}}>
-              <div style={{fontSize:"9px",color:pass?"#00e676":"#ff6b35",fontWeight:"bold"}}>{label}</div>
-              <div style={{fontSize:"6px",color:"#1e4060"}}>{pass?"✓":rule}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{fontSize:"11px",color:t.primary,letterSpacing:"0.15em",fontWeight:"bold"}}>
-          {prediction.main.join("  ·  ")} + MB {prediction.mega}
-        </div>
-      </div>
-
-      {/* Split avoidance heatmap */}
-      <div style={S.panel("smart")}>
-        <span style={S.label(t.secondary)}>· Player Popularity Bias · Red = Overplayed · Avoid these ·</span>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:"3px",marginBottom:"8px"}}>
-          {scores.map(s=>{
-            const pop  = s.pop;
-            const isP  = predSet.has(s.num);
-            const bgColor = pop>1.8?"rgba(80,10,0,0.7)":pop>1.4?"rgba(60,20,0,0.7)":pop>1.1?"rgba(20,40,0,0.7)":"rgba(0,40,20,0.7)";
-            const border  = pop>1.8?"#ff3333":pop>1.4?"#ff8c00":pop>1.1?"#ffb347":"#00e676";
-            return (
-              <div key={s.num} onClick={()=>setSelectedBall({modelIdx:1,num:s.num})}
-                style={{background:bgColor,border:`1px solid ${isP?"#fff":border}44`,
-                  borderRadius:"4px",padding:"4px 1px",textAlign:"center",cursor:"pointer",
-                  position:"relative"}}>
-                <div style={{fontSize:"clamp(8px,1.2vw,11px)",color:isP?"#fff":border,
-                  fontWeight:isP?"bold":"normal"}}>{s.num}</div>
-                <div style={{fontSize:"6px",color:"#1e4060",marginTop:"1px"}}>{s.pop.toFixed(1)}×</div>
-                {isP&&<div style={{position:"absolute",top:"-2px",right:"-2px",width:"5px",height:"5px",
-                  borderRadius:"50%",background:"#fff",animation:"pulse 1.5s ease-in-out infinite"}}/>}
-              </div>
-            );
-          })}
-        </div>
-        <div style={{display:"flex",gap:"12px",flexWrap:"wrap",justifyContent:"center"}}>
-          {[["#ff3333","Pop >1.8× (avoid)"],["#ff8c00","Pop >1.4×"],["#ffb347","Pop >1.1×"],["#00e676","Contrarian ✓"]].map(([c,l])=>(
-            <div key={l} style={{display:"flex",alignItems:"center",gap:"3px"}}>
-              <div style={{width:"8px",height:"8px",borderRadius:"50%",background:c}}/>
-              <span style={{fontSize:"7px",color:"#2a5070"}}>{l}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Top 15 */}
-      <div style={S.panel("smart")}>
-        <span style={S.label(t.secondary)}>· Top 15 by Smart Score ·</span>
-        {sorted.slice(0,15).map((s,i)=>{
-          const pct=(s.score/maxS)*100;
-          return (
-            <div key={s.num} onClick={()=>setSelectedBall({modelIdx:1,num:s.num})}
-              style={{marginBottom:"5px",display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}>
-              <div style={{width:"16px",fontSize:"7px",color:"#1e4060",textAlign:"right"}}>#{i+1}</div>
-              <div style={{width:"22px",fontSize:"10px",fontWeight:"bold",textAlign:"center",
-                color:predSet.has(s.num)?"#fff":t.primary}}>{s.num}</div>
-              <div style={{flex:1,height:"6px",background:"rgba(0,20,10,0.8)",borderRadius:"3px",overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${pct}%`,
-                  background:`linear-gradient(90deg,${t.primary}55,${t.primary})`,borderRadius:"3px"}}/>
-              </div>
-              <div style={{width:"50px",fontSize:"7px",color:"#1e4060",textAlign:"right"}}>
-                sp:{s.springE.toFixed(2)}</div>
-              <div style={{width:"44px",fontSize:"8px",color:"#2a5070",textAlign:"right"}}>
-                {s.score.toFixed(3)}</div>
-              <div style={{width:"8px",fontSize:"8px",color:"#ffd600"}}>
-                {predSet.has(s.num)?"★":""}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {detailBall && (
-        <div style={{...S.panel("smart"),animation:"flowIn 0.25s ease"}}>
-          <span style={S.label(t.primary)}>· Ball {detailBall.num} · Smart Play Metrics ·</span>
-          <div style={{display:"flex",flexWrap:"wrap",gap:"20px"}}>
-            <div style={{textAlign:"center",minWidth:"70px"}}>
-              <div style={{fontSize:"32px",fontWeight:"900",color:t.primary}}>{detailBall.num}</div>
-              <div style={{fontSize:"7px",color:"#1e4060"}}>{detailBall.freq} draws</div>
+      {det && (
+        <div style={{...mkPanel("fluid"),animation:"flowIn 0.25s ease"}}>
+          <span style={mkLbl(t.p)}>Ball {det.num} - Full Metrics</span>
+          <div style={{display:"flex",flexWrap:"wrap",gap:"18px"}}>
+            <div style={{textAlign:"center",minWidth:"60px"}}>
+              <div style={{fontSize:"28px",fontWeight:"900",color:t.p}}>{det.num}</div>
+              <div style={{fontSize:"7px",color:"#1e4060"}}>{det.freq} draws</div>
               <div style={{fontSize:"7px",marginTop:"2px",
-                color:detailBall.pop>1.5?"#ff6b35":detailBall.pop>1.2?"#ffb347":"#00e676"}}>
-                {detailBall.tag}
+                color:det.regime==="turbulent"?"#ff3333":det.regime==="transitional"?"#ff8c00":"#00e676"}}>
+                {det.regime&&det.regime.toUpperCase()}
               </div>
             </div>
-            <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 20px"}}>
-              {detailBall.metrics?.map(([k,v])=>(
-                <div key={k}>
-                  <div style={{fontSize:"7px",color:"#1e4060",letterSpacing:"0.12em"}}>{k.toUpperCase()}</div>
-                  <div style={{fontSize:"12px",color:t.primary}}>{v}</div>
-                </div>
-              ))}
+            <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px"}}>
+              {det.metrics&&det.metrics.map(function(row){
+                var k=row[0],v=row[1];
+                return (
+                  <div key={k}>
+                    <div style={{fontSize:"7px",color:"#1e4060",letterSpacing:"0.1em"}}>{k.toUpperCase()}</div>
+                    <div style={{fontSize:"12px",color:t.p}}>{v}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
-// ─── QUANTUM MODEL VIEW ───────────────────────────────────────────────────────
-function QuantumModelView({scores,mbScores,prediction,S,Ball,selectedBall,setSelectedBall}) {
-  const t = THEME.quantum;
-  const sorted = [...scores].sort((a,b)=>b.score-a.score);
-  const maxS = sorted[0].score;
-  const predSet = new Set(prediction.main);
-  const detailBall = selectedBall?.modelIdx===2
-    ? scores.find(s=>s.num===selectedBall.num) : null;
-
-  const stateColor = (state) =>
-    state==="RESONANT"?"#e040fb":state==="COLLAPSED"?"#ff3333":
-    state==="DESTRUCTIVE"?"#448aff":"#a78bfa";
-
+function SmartDetail(props) {
+  var scores=props.scores, mbScores=props.mbScores, pred=props.pred, sel=props.sel, setSel=props.setSel;
+  var t = TH.smart;
+  var sorted = [...scores].sort(function(a,b){return b.score-a.score;});
+  var maxS = sorted[0].score;
+  var predSet = {};
+  pred.main.forEach(function(n){predSet[n]=true;});
+  var det = (sel && sel.mi===1) ? scores.filter(function(s){return s.num===sel.num;})[0] : null;
+  var sum  = pred.main.reduce(function(a,b){return a+b;},0);
+  var odds = pred.main.filter(function(n){return n%2!==0;}).length;
+  var lows = pred.main.filter(function(n){return n<=35;}).length;
   return (
-    <>
-      <div style={{...S.panel("quantum"),textAlign:"center"}}>
-        <span style={S.label(t.primary)}>· Quantum Entanglement Model · For Science & Fun ·</span>
-        <div style={{fontSize:"8px",color:"#2a1040",marginBottom:"16px",lineHeight:2.0,
-          maxWidth:"640px",margin:"0 auto 16px",fontStyle:"italic"}}>
-          <span style={{color:"#e040fb"}}>ψ(n) = √(f/N) · e^(iθ)</span>
-          {"  "}where θ = 2π·ago/T
-          {"  "}·{"  "}
-          <span style={{color:"#a78bfa"}}>P(n) = |ψ|² · interference + tunneling + entanglement</span>
-        </div>
-
-        <div style={{display:"flex",justifyContent:"center",gap:"14px",flexWrap:"wrap",marginBottom:"16px",alignItems:"flex-end"}}>
-          {prediction.main.map(n=>{
-            const s=scores.find(x=>x.num===n);
+    <div>
+      <div style={{...mkPanel("smart"),textAlign:"center"}}>
+        <span style={mkLbl(t.p)}>Smart Play - Spring + Split Avoidance + Balance</span>
+        <div style={{display:"flex",justifyContent:"center",gap:"11px",flexWrap:"wrap",marginBottom:"12px",alignItems:"flex-end"}}>
+          {pred.main.map(function(n){
+            var s=scores.filter(function(x){return x.num===n;})[0];
+            var rank=sorted.findIndex(function(x){return x.num===n;})+1;
             return (
               <div key={n} style={{textAlign:"center"}}>
-                <Ball num={n} modelIdx={2} size={66}
-                  showRank rank={sorted.findIndex(x=>x.num===n)+1} freq={s?.freq}/>
-                <div style={{fontSize:"7px",color:stateColor(s?.state),marginTop:"3px",
-                  letterSpacing:"0.08em",animation:s?.state==="RESONANT"?"quantumFlicker 3s ease-in-out infinite":"none"}}>
-                  {s?.state}
+                <BallEl num={n} mi={1} size={62} showRank={true} rank={rank} freq={s&&s.freq}
+                  selected={sel&&sel.mi===1&&sel.num===n}
+                  onClick={function(){setSel(sel&&sel.num===n&&sel.mi===1?null:{mi:1,num:n});}}/>
+                <div style={{fontSize:"7px",marginTop:"3px",
+                  color:s&&s.pop>1.5?"#ff6b35":s&&s.pop>1.2?"#ffb347":"#00e676"}}>
+                  {s&&s.tag}
                 </div>
               </div>
             );
           })}
-          <div style={{borderLeft:`1px solid ${t.border}`,paddingLeft:"14px",marginLeft:"4px"}}>
-            <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"4px"}}>MEGA BALL</div>
-            <Ball num={prediction.mega} modelIdx={2} isMega size={66}
-              freq={mbScores.find(s=>s.num===prediction.mega)?.freq}/>
+          <div style={{borderLeft:"1px solid "+t.br,paddingLeft:"11px",marginLeft:"3px"}}>
+            <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"3px"}}>MEGA BALL</div>
+            <BallEl num={pred.mega} mi={1} isMega={true} size={62}
+              freq={(mbScores.filter(function(s){return s.num===pred.mega;})[0]||{}).freq}/>
           </div>
         </div>
-        <div style={{fontSize:"11px",color:t.primary,letterSpacing:"0.15em",fontWeight:"bold"}}>
-          {prediction.main.join("  ·  ")} + MB {prediction.mega}
+        <div style={{display:"inline-flex",gap:"11px",background:"rgba(0,30,15,0.6)",
+          border:"1px solid rgba(0,200,100,0.2)",borderRadius:"8px",padding:"6px 13px",
+          flexWrap:"wrap",justifyContent:"center",marginBottom:"10px"}}>
+          <span style={{fontSize:"7px",color:"#1e4060",alignSelf:"center"}}>BALANCE</span>
+          {[["Sum: "+sum, sum>=100&&sum<=175,"100-175"],
+            ["Odd: "+odds+"/"+(5-odds), odds>=2&&odds<=3, "2-3 odd"],
+            ["Low: "+lows+"/"+(5-lows), lows>=2&&lows<=3, "2-3 low"]
+          ].map(function(row){
+            var label=row[0],pass=row[1],rule=row[2];
+            return (
+              <div key={label} style={{textAlign:"center"}}>
+                <div style={{fontSize:"9px",color:pass?"#00e676":"#ff6b35",fontWeight:"bold"}}>{label}</div>
+                <div style={{fontSize:"6px",color:"#1e4060"}}>{pass?"OK":rule}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{fontSize:"11px",color:t.p,letterSpacing:"0.12em",fontWeight:"bold"}}>
+          {pred.main.join("  -  ")} + MB {pred.mega}
         </div>
       </div>
 
-      {/* Quantum state field */}
-      <div style={S.panel("quantum")}>
-        <span style={S.label(t.secondary)}>· Quantum State Field · Ball Superposition Visualization ·</span>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:"3px",marginBottom:"8px"}}>
-          {scores.map(s=>{
-            const isP  = predSet.has(s.num);
-            const sc   = stateColor(s.state);
-            const alpha = Math.min(s.score/maxS*1.4,1);
+      <div style={mkPanel("smart")}>
+        <span style={mkLbl(t.s)}>Popularity Bias Map - Red = Overplayed</span>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:"3px",marginBottom:"7px"}}>
+          {scores.map(function(s){
+            var isP=predSet[s.num];
+            var bc=s.pop>1.8?"rgba(80,10,0,0.7)":s.pop>1.4?"rgba(60,20,0,0.7)":s.pop>1.1?"rgba(20,40,0,0.7)":"rgba(0,40,20,0.7)";
+            var bd=s.pop>1.8?"#ff3333":s.pop>1.4?"#ff8c00":s.pop>1.1?"#ffb347":"#00e676";
             return (
-              <div key={s.num} onClick={()=>setSelectedBall({modelIdx:2,num:s.num})}
-                style={{background:`rgba(30,0,50,${alpha*0.6})`,
-                  border:`1px solid ${isP?"#fff":sc}${isP?"":"44"}`,
+              <div key={s.num} className="bc"
+                onClick={function(){setSel(sel&&sel.num===s.num&&sel.mi===1?null:{mi:1,num:s.num});}}
+                style={{background:bc,border:"1px solid "+(isP?"#fff":bd)+"44",
                   borderRadius:"4px",padding:"4px 1px",textAlign:"center",cursor:"pointer",
-                  position:"relative",
-                  boxShadow:isP?`0 0 10px ${t.glow}`:s.state==="RESONANT"?`0 0 6px ${t.glow}60`:"none",
-                  animation:s.state==="RESONANT"?"quantumFlicker 3s ease-in-out infinite":"none"}}>
-                <div style={{fontSize:"clamp(8px,1.2vw,11px)",color:isP?"#fff":sc,
-                  fontWeight:isP?"bold":"normal"}}>{s.num}</div>
-                <div style={{fontSize:"6px",color:"#2a1040",marginTop:"1px"}}>
-                  {s.state==="RESONANT"?"~":s.state==="COLLAPSED"?"×":s.state==="DESTRUCTIVE"?"↓":"○"}
-                </div>
-                {isP&&<div style={{position:"absolute",top:"-2px",right:"-2px",width:"5px",height:"5px",
+                  position:"relative",transition:"transform 0.15s"}}>
+                <div style={{fontSize:"clamp(8px,1.2vw,11px)",color:isP?"#fff":bd,fontWeight:isP?"bold":"normal"}}>{s.num}</div>
+                <div style={{fontSize:"6px",color:"#1e4060",marginTop:"1px"}}>{s.pop.toFixed(1)}x</div>
+                {isP && <div style={{position:"absolute",top:"-2px",right:"-2px",width:"5px",height:"5px",
                   borderRadius:"50%",background:"#fff",animation:"pulse 1.5s ease-in-out infinite"}}/>}
               </div>
             );
           })}
         </div>
-        <div style={{display:"flex",gap:"12px",flexWrap:"wrap",justifyContent:"center"}}>
-          {[["#e040fb","~ RESONANT (constructive)"],["#ff3333","× COLLAPSED (just drawn)"],
-            ["#448aff","↓ DESTRUCTIVE (out-of-phase)"],["#a78bfa","○ SUPERPOSED"]].map(([c,l])=>(
-            <div key={l} style={{display:"flex",alignItems:"center",gap:"3px"}}>
-              <div style={{width:"8px",height:"8px",borderRadius:"50%",background:c}}/>
-              <span style={{fontSize:"7px",color:"#3a2070"}}>{l}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* Entangled pairs */}
-      <div style={S.panel("quantum")}>
-        <span style={S.label(t.secondary)}>· Quantum Entangled Pairs · Most Correlated All-Time ·</span>
-        <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
-          {ENTANGLED_PAIRS.map(([a,b])=>(
-            <div key={`${a}-${b}`} style={{display:"flex",alignItems:"center",gap:"4px",
-              background:"rgba(30,0,60,0.6)",border:"1px solid rgba(200,50,255,0.2)",
-              borderRadius:"20px",padding:"4px 10px"}}>
-              <span style={{fontSize:"11px",fontWeight:"bold",color:t.primary}}>{a}</span>
-              <span style={{fontSize:"8px",color:"#3a1060"}}>⟷</span>
-              <span style={{fontSize:"11px",fontWeight:"bold",color:t.primary}}>{b}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{fontSize:"8px",color:"#1a1030",marginTop:"8px",lineHeight:1.7}}>
-          Entangled balls share quantum correlation — when one enters superposition, its partner
-          receives an amplitude boost of +0.08 in the wave function calculation.
-        </div>
-      </div>
-
-      {/* Top 15 */}
-      <div style={S.panel("quantum")}>
-        <span style={S.label(t.secondary)}>· Top 15 by Quantum Score ·</span>
-        {sorted.slice(0,15).map((s,i)=>{
-          const pct=(s.score/maxS)*100;
-          const sc=stateColor(s.state);
+      <div style={mkPanel("smart")}>
+        <span style={mkLbl(t.s)}>Top 15 by Smart Score</span>
+        {sorted.slice(0,15).map(function(s,i){
+          var pct=(s.score/maxS)*100;
           return (
-            <div key={s.num} onClick={()=>setSelectedBall({modelIdx:2,num:s.num})}
+            <div key={s.num} onClick={function(){setSel(sel&&sel.num===s.num&&sel.mi===1?null:{mi:1,num:s.num});}}
               style={{marginBottom:"5px",display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}>
-              <div style={{width:"16px",fontSize:"7px",color:"#1e1040",textAlign:"right"}}>#{i+1}</div>
+              <div style={{width:"18px",fontSize:"7px",color:"#1e4060",textAlign:"right"}}>#{i+1}</div>
               <div style={{width:"22px",fontSize:"10px",fontWeight:"bold",textAlign:"center",
-                color:predSet.has(s.num)?"#fff":t.primary}}>{s.num}</div>
-              <div style={{flex:1,height:"6px",background:"rgba(20,0,40,0.8)",borderRadius:"3px",overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${pct}%`,
-                  background:`linear-gradient(90deg,${t.primary}55,${t.primary})`,borderRadius:"3px"}}/>
+                color:predSet[s.num]?"#fff":t.p}}>{s.num}</div>
+              <div style={{flex:1,height:"6px",background:"rgba(0,20,10,0.8)",borderRadius:"3px",overflow:"hidden"}}>
+                <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,"+t.p+"55,"+t.p+")",borderRadius:"3px"}}/>
               </div>
-              <div style={{width:"60px",fontSize:"7px",color:sc,textAlign:"right",letterSpacing:"0.05em"}}>
-                {s.state}</div>
-              <div style={{width:"44px",fontSize:"8px",color:"#3a2070",textAlign:"right"}}>
-                {s.score.toFixed(3)}</div>
-              <div style={{width:"8px",fontSize:"8px",color:"#ffd600"}}>
-                {predSet.has(s.num)?"★":""}</div>
+              <div style={{width:"42px",fontSize:"8px",color:"#2a5070",textAlign:"right"}}>{s.score.toFixed(3)}</div>
+              <div style={{width:"8px",fontSize:"8px",color:"#ffd600"}}>{predSet[s.num]?"*":""}</div>
+            </div>
+          );
+        })}
+      </div>
+      {det && (
+        <div style={{...mkPanel("smart"),animation:"flowIn 0.25s ease"}}>
+          <span style={mkLbl(t.p)}>Ball {det.num} - Smart Metrics</span>
+          <div style={{display:"flex",flexWrap:"wrap",gap:"16px"}}>
+            <div style={{textAlign:"center",minWidth:"60px"}}>
+              <div style={{fontSize:"28px",fontWeight:"900",color:t.p}}>{det.num}</div>
+              <div style={{fontSize:"7px",color:"#1e4060"}}>{det.freq} draws</div>
+              <div style={{fontSize:"7px",marginTop:"2px",
+                color:det.pop>1.5?"#ff6b35":det.pop>1.2?"#ffb347":"#00e676"}}>{det.tag}</div>
+            </div>
+            <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px"}}>
+              {det.metrics&&det.metrics.map(function(row){
+                var k=row[0],v=row[1];
+                return (
+                  <div key={k}>
+                    <div style={{fontSize:"7px",color:"#1e4060",letterSpacing:"0.1em"}}>{k.toUpperCase()}</div>
+                    <div style={{fontSize:"12px",color:t.p}}>{v}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuantumDetail(props) {
+  var scores=props.scores, mbScores=props.mbScores, pred=props.pred, sel=props.sel, setSel=props.setSel;
+  var t = TH.quantum;
+  var sorted = [...scores].sort(function(a,b){return b.score-a.score;});
+  var maxS = sorted[0].score;
+  var predSet = {};
+  pred.main.forEach(function(n){predSet[n]=true;});
+  var det = (sel && sel.mi===2) ? scores.filter(function(s){return s.num===sel.num;})[0] : null;
+  return (
+    <div>
+      <div style={{...mkPanel("quantum"),textAlign:"center"}}>
+        <span style={mkLbl(t.p)}>Quantum Entanglement - For Science and Fun</span>
+        <div style={{fontSize:"8px",color:"#2a1040",marginBottom:"12px",lineHeight:2,fontStyle:"italic"}}>
+          psi(n) = sqrt(f/N) * exp(i*theta) &nbsp;|&nbsp; P = |psi|^2 * interference + tunneling + entanglement
+        </div>
+        <div style={{display:"flex",justifyContent:"center",gap:"11px",flexWrap:"wrap",marginBottom:"12px",alignItems:"flex-end"}}>
+          {pred.main.map(function(n){
+            var s=scores.filter(function(x){return x.num===n;})[0];
+            var rank=sorted.findIndex(function(x){return x.num===n;})+1;
+            return (
+              <div key={n} style={{textAlign:"center"}}>
+                <BallEl num={n} mi={2} size={62} showRank={true} rank={rank} freq={s&&s.freq}
+                  selected={sel&&sel.mi===2&&sel.num===n}
+                  onClick={function(){setSel(sel&&sel.num===n&&sel.mi===2?null:{mi:2,num:n});}}/>
+                <div style={{fontSize:"7px",color:qsc(s&&s.state),marginTop:"3px",
+                  animation:s&&s.state==="RESONANT"?"qFlick 3s ease-in-out infinite":"none"}}>
+                  {s&&s.state}
+                </div>
+              </div>
+            );
+          })}
+          <div style={{borderLeft:"1px solid "+t.br,paddingLeft:"11px",marginLeft:"3px"}}>
+            <div style={{fontSize:"7px",color:"#3a2000",marginBottom:"3px"}}>MEGA BALL</div>
+            <BallEl num={pred.mega} mi={2} isMega={true} size={62}
+              freq={(mbScores.filter(function(s){return s.num===pred.mega;})[0]||{}).freq}/>
+          </div>
+        </div>
+        <div style={{fontSize:"11px",color:t.p,letterSpacing:"0.12em",fontWeight:"bold"}}>
+          {pred.main.join("  -  ")} + MB {pred.mega}
+        </div>
+      </div>
+
+      <div style={mkPanel("quantum")}>
+        <span style={mkLbl(t.s)}>Quantum State Field</span>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:"3px",marginBottom:"7px"}}>
+          {scores.map(function(s){
+            var isP=predSet[s.num], sCol=qsc(s.state);
+            var alpha=Math.min(s.score/maxS*1.4,1);
+            return (
+              <div key={s.num} className="bc"
+                onClick={function(){setSel(sel&&sel.num===s.num&&sel.mi===2?null:{mi:2,num:s.num});}}
+                style={{background:"rgba(30,0,50,"+(alpha*0.6)+")",
+                  border:"1px solid "+(isP?"#fff":sCol)+(isP?"":"44"),
+                  borderRadius:"4px",padding:"4px 1px",textAlign:"center",cursor:"pointer",
+                  position:"relative",transition:"transform 0.15s",
+                  animation:s.state==="RESONANT"?"qFlick 3.5s ease-in-out infinite":"none"}}>
+                <div style={{fontSize:"clamp(8px,1.2vw,11px)",color:isP?"#fff":sCol,fontWeight:isP?"bold":"normal"}}>{s.num}</div>
+                <div style={{fontSize:"6px",color:"#2a1040",marginTop:"1px"}}>
+                  {s.state==="RESONANT"?"~":s.state==="COLLAPSED"?"x":s.state==="DESTRUCTIVE"?"v":"o"}
+                </div>
+                {isP && <div style={{position:"absolute",top:"-2px",right:"-2px",width:"5px",height:"5px",
+                  borderRadius:"50%",background:"#fff",animation:"pulse 1.5s ease-in-out infinite"}}/>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",gap:"9px",flexWrap:"wrap",justifyContent:"center"}}>
+          {[["#e040fb","~ RESONANT"],["#ff3333","x COLLAPSED"],["#448aff","v DESTRUCTIVE"],["#a78bfa","o SUPERPOSED"]].map(function(row){
+            var c=row[0],l=row[1];
+            return (
+              <div key={l} style={{display:"flex",alignItems:"center",gap:"3px"}}>
+                <div style={{width:"7px",height:"7px",borderRadius:"50%",background:c}}/>
+                <span style={{fontSize:"7px",color:"#3a2070"}}>{l}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={mkPanel("quantum")}>
+        <span style={mkLbl(t.s)}>Entangled Pairs</span>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"7px"}}>
+          {ENTANGLED_PAIRS.map(function(pair){
+            var a=pair[0],b=pair[1];
+            return (
+              <div key={a+"-"+b} style={{display:"flex",alignItems:"center",gap:"4px",
+                background:"rgba(30,0,60,0.6)",border:"1px solid rgba(200,50,255,0.18)",
+                borderRadius:"18px",padding:"3px 9px"}}>
+                <span style={{fontSize:"11px",fontWeight:"bold",color:t.p}}>{a}</span>
+                <span style={{fontSize:"8px",color:"#3a1060"}}>&lt;&gt;</span>
+                <span style={{fontSize:"11px",fontWeight:"bold",color:t.p}}>{b}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{fontSize:"8px",color:"#1a1030",lineHeight:1.7}}>
+          Correlated pairs share +0.08 amplitude boost in the wave function.
+        </div>
+      </div>
+
+      <div style={mkPanel("quantum")}>
+        <span style={mkLbl(t.s)}>Top 15 by Quantum Score</span>
+        {sorted.slice(0,15).map(function(s,i){
+          var pct=(s.score/maxS)*100, sCol=qsc(s.state);
+          return (
+            <div key={s.num} onClick={function(){setSel(sel&&sel.num===s.num&&sel.mi===2?null:{mi:2,num:s.num});}}
+              style={{marginBottom:"5px",display:"flex",alignItems:"center",gap:"6px",cursor:"pointer"}}>
+              <div style={{width:"18px",fontSize:"7px",color:"#1e1040",textAlign:"right"}}>#{i+1}</div>
+              <div style={{width:"22px",fontSize:"10px",fontWeight:"bold",textAlign:"center",
+                color:predSet[s.num]?"#fff":t.p}}>{s.num}</div>
+              <div style={{flex:1,height:"6px",background:"rgba(20,0,40,0.8)",borderRadius:"3px",overflow:"hidden"}}>
+                <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,"+t.p+"55,"+t.p+")",borderRadius:"3px"}}/>
+              </div>
+              <div style={{width:"65px",fontSize:"7px",color:sCol,textAlign:"right"}}>{s.state}</div>
+              <div style={{width:"42px",fontSize:"8px",color:"#3a2070",textAlign:"right"}}>{s.score.toFixed(3)}</div>
+              <div style={{width:"8px",fontSize:"8px",color:"#ffd600"}}>{predSet[s.num]?"*":""}</div>
             </div>
           );
         })}
       </div>
 
-      {detailBall && (
-        <div style={{...S.panel("quantum"),animation:"flowIn 0.25s ease"}}>
-          <span style={S.label(t.primary)}>· Ball {detailBall.num} · Quantum State Metrics ·</span>
-          <div style={{display:"flex",flexWrap:"wrap",gap:"20px"}}>
-            <div style={{textAlign:"center",minWidth:"70px"}}>
-              <div style={{fontSize:"32px",fontWeight:"900",color:t.primary}}>{detailBall.num}</div>
-              <div style={{fontSize:"7px",color:"#1e1040"}}>{detailBall.freq} draws</div>
-              <div style={{fontSize:"7px",color:stateColor(detailBall.state),marginTop:"3px",
-                letterSpacing:"0.1em"}}>{detailBall.state}</div>
-              {detailBall.entanglement>0&&
-                <div style={{fontSize:"7px",color:t.primary,marginTop:"2px"}}>⟷ ENTANGLED</div>}
+      {det && (
+        <div style={{...mkPanel("quantum"),animation:"flowIn 0.25s ease"}}>
+          <span style={mkLbl(t.p)}>Ball {det.num} - Quantum Metrics</span>
+          <div style={{display:"flex",flexWrap:"wrap",gap:"16px"}}>
+            <div style={{textAlign:"center",minWidth:"60px"}}>
+              <div style={{fontSize:"28px",fontWeight:"900",color:t.p}}>{det.num}</div>
+              <div style={{fontSize:"7px",color:"#1e1040"}}>{det.freq} draws</div>
+              <div style={{fontSize:"7px",color:qsc(det.state),marginTop:"2px"}}>{det.state}</div>
+              {det.entanglement>0 && <div style={{fontSize:"7px",color:t.p,marginTop:"1px"}}>ENTANGLED</div>}
             </div>
-            <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 20px"}}>
-              {detailBall.metrics?.map(([k,v])=>(
-                <div key={k}>
-                  <div style={{fontSize:"7px",color:"#1e1040",letterSpacing:"0.12em"}}>{k.toUpperCase()}</div>
-                  <div style={{fontSize:"12px",color:t.primary}}>{v}</div>
-                </div>
-              ))}
+            <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"5px 16px"}}>
+              {det.metrics&&det.metrics.map(function(row){
+                var k=row[0],v=row[1];
+                return (
+                  <div key={k}>
+                    <div style={{fontSize:"7px",color:"#1e1040",letterSpacing:"0.1em"}}>{k.toUpperCase()}</div>
+                    <div style={{fontSize:"12px",color:t.p}}>{v}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
-    // Mount app and hide loading screen
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<TriModelPredictor />);
-    setTimeout(() => {
-      const l = document.getElementById('loading');
-      if (l) { l.style.opacity = '0'; setTimeout(() => l.remove(), 500); }
-    }, 800);
-  </script>
+var rootEl = ReactDOM.createRoot(document.getElementById("root"));
+rootEl.render(React.createElement(App, null));
+
+setTimeout(function(){
+  var l = document.getElementById("loading");
+  if(l){ l.style.opacity="0"; setTimeout(function(){l.remove();},600); }
+}, 1400);
+</script>
 </body>
 </html>
