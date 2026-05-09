@@ -140,6 +140,32 @@ async function storageSave(data) {
 }
 
 // =====================================================================
+// BALL DATA CACHE — persists merged draw data between page loads
+// =====================================================================
+var BALL_CACHE_KEY = "mm_ball_cache_v2";
+
+function saveBallCache(balls, mega, lastDate, total) {
+  try {
+    localStorage.setItem(BALL_CACHE_KEY, JSON.stringify({
+      balls:balls, mega:mega, lastDate:lastDate, total:total, savedAt:Date.now()
+    }));
+  } catch(e) {}
+}
+
+function loadBallCache() {
+  try {
+    var raw = localStorage.getItem(BALL_CACHE_KEY);
+    if(!raw) return null;
+    var d = JSON.parse(raw);
+    if(d && d.lastDate > BASELINE_DATE && d.balls && d.balls.length===70 && d.mega && d.mega.length===24) return d;
+    return null;
+  } catch(e) { return null; }
+}
+
+// Load synchronously before first render so initial state is instant
+var _initCache = loadBallCache();
+
+// =====================================================================
 // LIVE FETCH & MERGE
 // =====================================================================
 async function fetchNewDrawings() {
@@ -156,20 +182,29 @@ function mergeDrawings(newDraws) {
   BASE_BALL_DATA.forEach(function(r){ bm[r[0]]=[r[0],r[1],r[2]]; });
   BASE_MEGA_DATA.forEach(function(r){ mm[r[0]]=[r[0],r[1],r[2]]; });
   var total=newDraws.length;
+  if(total===0) return {balls:Object.values(bm),mega:Object.values(mm)};
+
+  // Track last draw index (0=oldest, total-1=newest) each ball appeared in
+  var lastSeenBall={}, lastSeenMB={};
   newDraws.forEach(function(d,idx){
     var balls=(d.winning_numbers||"").trim().split(/\s+/).map(Number).filter(function(n){return n>=1&&n<=70;});
     var mega=parseInt(d.mega_ball||"0",10);
-    var ago=total-idx;
-    balls.forEach(function(n){if(bm[n]){bm[n][1]+=1;bm[n][2]=ago;}});
-    if(mm[mega]){mm[mega][1]+=1;mm[mega][2]=ago;}
+    balls.forEach(function(n){ if(bm[n]){ bm[n][1]+=1; lastSeenBall[n]=idx; } });
+    if(mm[mega]){ mm[mega][1]+=1; lastSeenMB[mega]=idx; }
   });
-  if(total>0){
-    var last=newDraws[total-1];
-    var lb=(last.winning_numbers||"").trim().split(/\s+/).map(Number);
-    var lm=parseInt(last.mega_ball||"0",10);
-    lb.forEach(function(n){if(bm[n])bm[n][2]=1;});
-    if(mm[lm])mm[lm][2]=1;
-  }
+
+  // Update drawsAgo for ALL balls:
+  //   In new draws: ago = total - lastSeenIdx   (1 = drawn in most recent draw)
+  //   Not in any new draw: ago += total          (has been that many more draws since last seen)
+  Object.values(bm).forEach(function(entry){
+    if(lastSeenBall[entry[0]]!==undefined){ entry[2]=total-lastSeenBall[entry[0]]; }
+    else { entry[2]+=total; }
+  });
+  Object.values(mm).forEach(function(entry){
+    if(lastSeenMB[entry[0]]!==undefined){ entry[2]=total-lastSeenMB[entry[0]]; }
+    else { entry[2]+=total; }
+  });
+
   return {balls:Object.values(bm),mega:Object.values(mm)};
 }
 
@@ -743,12 +778,17 @@ function TrackerTab(props){
 // ROOT APP
 // =====================================================================
 function App(){
-  var bS=useState(BASE_BALL_DATA); var balls=bS[0],setBalls=bS[1];
-  var mS=useState(BASE_MEGA_DATA); var mega=mS[0],setMega=mS[1];
-  var stS=useState("loading");     var appStatus=stS[0],setAppStatus=stS[1];
-  var iS=useState({totalLoaded:0,lastDrawDate:BASELINE_DATE,lastChecked:null,newOnRefresh:null,phase:"loading",total:BASE_DRAWS,error:null}); var info=iS[0],setInfo=iS[1];
+  // Use cached data if available for instant display, fall back to baseline
+  var bS=useState(_initCache ? _initCache.balls : BASE_BALL_DATA); var balls=bS[0],setBalls=bS[1];
+  var mS=useState(_initCache ? _initCache.mega  : BASE_MEGA_DATA);  var mega=mS[0],setMega=mS[1];
+  var stS=useState(_initCache ? "ready" : "loading"); var appStatus=stS[0],setAppStatus=stS[1];
+  var iS=useState(_initCache ? {
+    totalLoaded:_initCache.total-BASE_DRAWS, lastDrawDate:_initCache.lastDate,
+    lastChecked:null, newOnRefresh:null, phase:"loaded", total:_initCache.total, error:null
+  } : {totalLoaded:0,lastDrawDate:BASELINE_DATE,lastChecked:null,newOnRefresh:null,phase:"loading",total:BASE_DRAWS,error:null});
+  var info=iS[0],setInfo=iS[1];
   var rS=useState(false);          var refreshing=rS[0],setRefreshing=rS[1];
-  var lastLoadedDateRef=useRef(BASELINE_DATE);
+  var lastLoadedDateRef=useRef(_initCache ? _initCache.lastDate : BASELINE_DATE);
   var tS=useState("compare");      var tab=tS[0],setTab=tS[1];
   var seS=useState(null);          var sel=seS[0],setSel=seS[1];
   var eS=useState(false);          var showEV=eS[0],setShowEV=eS[1];
@@ -772,7 +812,13 @@ function App(){
       var newSinceLast=nd.filter(function(d){
         return (d.draw_date||"").substring(0,10)>lastLoadedDateRef.current;
       }).length;
-      if(nd.length>0){var m=mergeDrawings(nd);setBalls(m.balls);setMega(m.mega);}
+      if(nd.length>0){
+        var m=mergeDrawings(nd);
+        setBalls(m.balls);
+        setMega(m.mega);
+        // Persist merged data so next page load is instant and correct
+        saveBallCache(m.balls, m.mega, latestDate, BASE_DRAWS+nd.length);
+      }
       lastLoadedDateRef.current=latestDate;
       setInfo({
         totalLoaded:nd.length,
@@ -791,6 +837,9 @@ function App(){
       if(isRefresh)setRefreshing(false);
     });
   }
+  // Always run a background API check on mount.
+  // If cache loaded instantly, this will find any draws newer than the cache.
+  // If no cache, this is the first load.
   useEffect(function(){doFetch(false);},[]);
 
   var fB=useMemo(function(){return modelFluid(balls,70,5);},[balls]);
