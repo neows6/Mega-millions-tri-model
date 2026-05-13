@@ -221,90 +221,94 @@ function mergeDrawings(newDraws) {
 }
 
 // =====================================================================
-// RECENT WINDOW BUILDER  (lightweight — just builds per-ball hit map)
-// No scoring here. Recency is already encoded in drawsAgo via mergeDrawings.
-// recentMap is only used so metrics can show "X hits in last W draws."
+// LOGISTIC OVERDUE RATIO  (the core responsive signal)
+//
+//   raw_ratio(ball) = drawsAgo * freq / TOTAL_DRAWS
+//                   = drawsAgo / expected_gap
+//
+//   expected_gap = TOTAL_DRAWS / freq  (ball's own historical return rate)
+//
+//   raw_ratio > 1.0 means ball is past its expected return interval
+//   raw_ratio = 6.8 means ball is 6.8x overdue vs its own history
+//
+//   logistic(r) = r / (1 + r)  → bounded [0,1), diminishing returns
+//   This prevents any single extremely-overdue ball from permanently
+//   dominating, while still correctly ranking overdue balls highest.
+//
+//   Critically: when a ball IS drawn, drawsAgo → 1, ratio drops to
+//   freq/TOTAL ≈ 0.08, logistic ≈ 0.07. Pick falls out of top 5.
+//   This is what makes picks change every draw.
 // =====================================================================
+function logisticOverdue(freq, ago, totalDraws) {
+  var ratio = (ago * freq) / totalDraws;  // normalised by ball's own rate
+  return ratio / (1 + ratio);             // logistic [0,1)
+}
+
+// buildRecentMap: simple hit counter for display metrics only
 function buildRecentMap(recentDraws, isMega) {
-  var hitMap = {}, W = recentDraws.length;
-  recentDraws.forEach(function(d) {
-    var nums = isMega ? [d.mega] : (d.balls||[]);
-    nums.forEach(function(n){ if(n>=1) hitMap[n]=(hitMap[n]||0)+1; });
+  var hitMap={}, W=recentDraws.length;
+  recentDraws.forEach(function(d){
+    var nums=isMega?[d.mega]:(d.balls||[]);
+    nums.forEach(function(n){if(n>=1)hitMap[n]=(hitMap[n]||0)+1;});
   });
-  return { hitMap:hitMap, W:W };
+  return{hitMap:hitMap,W:W};
 }
 
 // =====================================================================
-// MODEL 1 — NAVIER-STOKES FLUID DYNAMICS  (first principles)
+// MODEL 1 — NAVIER-STOKES FLUID DYNAMICS
 //
-// Physical model: each ball is a particle in a recirculating fluid.
-//   Pressure P  = freq/fMean        ← statistical weight vs mean
-//   Velocity v  = ago/ei            ← CORRECTED: overdue → high v
-//                                      just drawn → near-zero v
-//   Reynolds Re = ρvL/μ             ← turbulence from NS formula
-//   Bernoulli B = P + ½ρv²          ← total mechanical energy
-//   Vorticity ω = |P−1|             ← deviation from equilibrium
+//   Uses logistic_overdue as velocity v — the physically correct signal:
+//   a ball normalised far past its expected return gap has high "pressure".
 //
-//   Score: equal-weight ensemble of normalized physics terms
-//   F = (P_n + v_n + B_n) / 3       ← maximum entropy weighting
-//   (equal weights justified because no prior preference for any
-//    physical quantity over another — this is the least-biased choice)
+//   P  = freq / fMean          (historical frequency weight)
+//   v  = logistic_overdue      (normalised overdue signal, [0,1))
+//   Re = ρvL/μ                 (Reynolds number, turbulence)
+//   B  = P + ½ρv²              (Bernoulli total energy)
+//   Score = equal-weight normalised ensemble: (Pn + vn + Bn) / 3
 //
-// Removed: arbitrary cap, arbitrary overdue bonus, arbitrary 70/30 blend
+//   Picks change when any top-5 ball is drawn (its v drops from ~0.87
+//   to ~0.07), allowing the next-ranked ball to enter the top 5.
 // =====================================================================
-function modelFluid(data, pool, bpd, recentDraws) {
-  var ei   = pool / bpd;
-  var rho  = 1.0, mu = 0.08, L = pool;
+function modelFluid(data, pool, bpd, recentDraws, totalDraws) {
+  var td = totalDraws || 3019;
+  var freqs=data.map(function(d){return d[1];});
+  var fMean=freqs.reduce(function(a,b){return a+b;},0)/freqs.length;
+  var fMax=Math.max.apply(null,freqs), fMin=Math.min.apply(null,freqs);
+  var rm=buildRecentMap(recentDraws||[], false);
 
-  var freqs = data.map(function(d){return d[1];});
-  var fMean = freqs.reduce(function(a,b){return a+b;},0) / freqs.length;
-  var fMax  = Math.max.apply(null,freqs), fMin = Math.min.apply(null,freqs);
-
-  // First pass: compute raw values to get normalisation denominators
-  var raw = data.map(function(r){
-    var num=r[0], freq=r[1], ago=r[2];
-    var P = freq / fMean;
-    // Logistic velocity: ago/(ago+ei) gives bounded [0,1) with diminishing returns.
-    // Prevents ultra-overdue balls from permanently dominating regardless of
-    // new draw activity. At ago=ei (expected interval): v=0.5 (natural midpoint).
-    var v = ago / (ago + ei);                 // logistic velocity [0,1)
-    var Re = rho * v * L / mu;
-    var B  = P + 0.5 * rho * v * v;
-    var w  = Math.abs(P - 1);
-    return {num:num, freq:freq, ago:ago, P:P, v:v, Re:Re, B:B, w:w};
+  var raw=data.map(function(r){
+    var num=r[0],freq=r[1],ago=r[2];
+    var P=freq/fMean;
+    var v=logisticOverdue(freq,ago,td);   // normalised by ball's own frequency
+    var Re=(v*pool)/0.08;
+    var B=P+0.5*v*v;
+    var w=Math.abs(P-1);
+    return{num:num,freq:freq,ago:ago,P:P,v:v,Re:Re,B:B,w:w};
   });
 
-  // Normalise each component to [0,1] across the dataset
-  var Pmax = Math.max.apply(null, raw.map(function(r){return r.P;}));
-  var Pmin = Math.min.apply(null, raw.map(function(r){return r.P;}));
-  var vmax = Math.max.apply(null, raw.map(function(r){return r.v;}));
-  var Bmax = Math.max.apply(null, raw.map(function(r){return r.B;}));
-  var Bmin = Math.min.apply(null, raw.map(function(r){return r.B;}));
-
-  var rm = buildRecentMap(recentDraws||[], false);
+  var Pmax=Math.max.apply(null,raw.map(function(r){return r.P;}));
+  var Pmin=Math.min.apply(null,raw.map(function(r){return r.P;}));
+  var vmax=Math.max.apply(null,raw.map(function(r){return r.v;}));
+  var Bmax=Math.max.apply(null,raw.map(function(r){return r.B;}));
+  var Bmin=Math.min.apply(null,raw.map(function(r){return r.B;}));
 
   return raw.map(function(r){
-    // Normalised components — each in [0,1]
-    var Pn = (Pmax > Pmin) ? (r.P - Pmin) / (Pmax - Pmin) : 0.5;
-    var vn = (vmax > 0)    ?  r.v / vmax                   : 0;
-    var Bn = (Bmax > Bmin) ? (r.B - Bmin) / (Bmax - Bmin) : 0.5;
-
-    // Equal-weight ensemble (maximum entropy principle)
-    var score = (Pn + vn + Bn) / 3;
-
-    var regime = r.Re > 4000 ? "turbulent"
-               : r.Re > 2300 ? "transitional"
-               :               "laminar";
-    return {
-      num:r.num, freq:r.freq, ago:r.ago, score:score,
-      P:r.P, v:r.v, Re:r.Re, B:r.B, w:r.w, regime:regime,
-      recentHits: rm.hitMap[r.num]||0,
+    var Pn=(Pmax>Pmin)?(r.P-Pmin)/(Pmax-Pmin):0.5;
+    var vn=(vmax>0)?r.v/vmax:0;
+    var Bn=(Bmax>Bmin)?(r.B-Bmin)/(Bmax-Bmin):0.5;
+    var score=(Pn+vn+Bn)/3;
+    var regime=r.Re>4000?"turbulent":r.Re>2300?"transitional":"laminar";
+    var rawRatio=(r.ago*r.freq)/td;
+    return{
+      num:r.num,freq:r.freq,ago:r.ago,score:score,
+      P:r.P,v:r.v,Re:r.Re,B:r.B,w:r.w,regime:regime,
+      recentHits:rm.hitMap[r.num]||0,
       metrics:[
-        ["Pressure P",    r.P.toFixed(4)],
+        ["Overdue ratio", rawRatio.toFixed(3)+" ("+r.ago+"draws)"],
         ["Velocity v",    r.v.toFixed(4)],
+        ["Pressure P",    r.P.toFixed(4)],
         ["Reynolds Re",   Math.round(r.Re)],
         ["Bernoulli B",   r.B.toFixed(4)],
-        ["Vorticity ω",   r.w.toFixed(4)],
         ["Recent hits",   (rm.hitMap[r.num]||0)+"/"+rm.W],
         ["NS-Score",      score.toFixed(5)]
       ]
@@ -313,141 +317,134 @@ function modelFluid(data, pool, bpd, recentDraws) {
 }
 
 // =====================================================================
-// MODEL 2 — SMART PLAY  (Expected Value Maximisation)
+// MODEL 2 — SMART PLAY  (EV Maximisation + Statistical Timing)
 //
-// Derivation: E[payout|win] ∝ 1/∏pop(i) → maximise Σ −log(pop(i))
+//   EV component (60%):  score_ev  = -log(popularity(n))  [derived]
+//     Maximises E[payout|win] by minimising Σpop(i)
+//     Continuous Gaussian popularity model — all 70 balls distinct
 //
-// Popularity model — CONTINUOUS across all 70 balls (70 distinct values):
-//   pop(n) = gaussian_decay(n) + round_bias(n) + specific_boosts(n)
+//   Timing component (40%): logistic_overdue(n)  [statistical]
+//     Selects from unpopular balls those most statistically due
+//     Makes picks responsive to new draw results
 //
-// Sources: Clotfelter & Cook (1993), Walker (1998) — documented lottery
-// player biases: birthday clustering (1-31), round-number preference,
-// culturally lucky numbers, smooth underplay of high numbers (32-70).
+//   Score = 0.60 * norm(ev) + 0.40 * logistic_overdue
 // =====================================================================
 function modelSmart(data, pool, bpd, totalDraws, recentDraws) {
-  function popularity(n) {
-    // Smooth Gaussian decay: players strongly prefer low numbers (birthdays/dates)
-    // Centred at n=1, σ=22 → at n=31 we're ~1.4σ, still elevated
-    var base = 1.0 + 1.2 * Math.exp(-Math.pow(n - 1, 2) / (2 * 22 * 22));
-    // Round number bias persists across full 1-70 range
-    var round5  = n % 5  === 0 ? 0.25 : 0.0;
-    var round10 = n % 10 === 0 ? 0.15 : 0.0;
-    // Specific culturally overplayed numbers (documented in literature)
-    var lucky = {7:0.60, 11:0.45, 13:0.35, 17:0.35, 21:0.30, 23:0.25,
-                 3:0.20, 9:0.15, 27:0.15, 33:0.10, 37:0.10, 42:0.10, 69:0.15};
-    var luckyBoost = lucky[n] || 0.0;
-    // Age-milestone numbers (slightly more popular)
-    var ageNums = [18,21,25,30,35,40,45,50,55,60,65];
-    var ageBoost = ageNums.indexOf(n) >= 0 ? 0.08 : 0.0;
-    return base + round5 + round10 + luckyBoost + ageBoost;
+  var td=totalDraws||3019;
+
+  function popularity(n){
+    var base=1.0+1.2*Math.exp(-Math.pow(n-1,2)/(2*22*22));
+    var r5=n%5===0?0.25:0;
+    var r10=n%10===0?0.15:0;
+    var lucky={7:0.60,11:0.45,13:0.35,17:0.35,21:0.30,23:0.25,
+               3:0.20,9:0.15,27:0.15,33:0.10,37:0.10,42:0.10,69:0.15};
+    var lb=lucky[n]||0;
+    var age=[18,21,25,30,35,40,45,50,55,60,65];
+    var ab=age.indexOf(n)>=0?0.08:0;
+    return base+r5+r10+lb+ab;
   }
 
-  var rm = buildRecentMap(recentDraws||[], false);
+  // Pre-compute EV normalisation range
+  var evRaw=data.map(function(r){return -Math.log(popularity(r[0]));});
+  var evMin=Math.min.apply(null,evRaw), evMax=Math.max.apply(null,evRaw);
+  var evRange=evMax-evMin||1;
+
+  var rm=buildRecentMap(recentDraws||[], false);
 
   return data.map(function(r){
-    var num=r[0], freq=r[1], ago=r[2];
-    var pop   = popularity(num);
-    var score = -Math.log(pop);   // derived: maximise Σ −log(pop_i)
-    var tag = pop > 2.0 ? "Overplayed"
-            : pop > 1.4 ? "Popular"
-            : pop > 1.1 ? "Mild"
-            :              "Contrarian";
-    return {
-      num:num, freq:freq, ago:ago, score:score, pop:pop, tag:tag,
-      recentHits: rm.hitMap[num]||0,
+    var num=r[0],freq=r[1],ago=r[2];
+    var pop=popularity(num);
+    var evNorm=(-Math.log(pop)-evMin)/evRange;          // [0,1]
+    var ov=logisticOverdue(freq,ago,td);                // [0,1)
+    var score=0.60*evNorm+0.40*ov;
+    var tag=pop>2.0?"Overplayed":pop>1.4?"Popular":pop>1.1?"Mild":"Contrarian";
+    return{
+      num:num,freq:freq,ago:ago,score:score,pop:pop,tag:tag,
+      recentHits:rm.hitMap[num]||0,
       metrics:[
-        ["Popularity",  pop.toFixed(4)],
-        ["-log(pop)",   score.toFixed(4)],
-        ["EV weight",   Math.exp(score).toFixed(4)],
-        ["Recent hits", (rm.hitMap[num]||0)+"/"+rm.W],
-        ["Tag",         tag]
+        ["Popularity",    pop.toFixed(4)],
+        ["-log(pop) norm",evNorm.toFixed(4)],
+        ["Overdue v",     ov.toFixed(4)],
+        ["EV score",      score.toFixed(4)],
+        ["Recent hits",   (rm.hitMap[num]||0)+"/"+rm.W],
+        ["Tag",           tag]
       ]
     };
   });
 }
 
 // =====================================================================
-// MODEL 3 — QUANTUM ENTANGLEMENT  (Quantum Mechanics)
+// MODEL 3 — QUANTUM ENTANGLEMENT
 //
-//   Wave function:    ψ(n) = √(freq/N) · e^(iθ)
-//   Phase:            θ    = 2π · ago/ei          ← normalised by ei
-//   Probability:      P(n) = |ψ|² · (1 + cos(θ)/2) ← exact interference
-//   Decoherence:      D(n) = exp(−ago / τ)
-//                     τ = ei/2 = pool/(2·bpd)     ← derived: half ei
-//                     (decoherence time = half the expected return period)
-//   Tunneling:        T(n) = exp(−κ·barrier)      ← quantum tunneling
-//                     barrier = max(f̄ − freq, 0) / f̄
-//   Entanglement:     +0.08 amplitude boost per correlated pair partner
+//   Phase θ uses normalised overdue ratio (not just ago/ei):
+//   θ = 2π × logistic_overdue  (ranges 0→2π as ball becomes more overdue)
 //
-//   Score = P(n) · D(n) + T(n) + E(n)
-//
-// All constants derived from the physical model — no ad-hoc tuning.
+//   Wave function amplitude: |ψ| = √(freq/total)
+//   Probability: P = |ψ|² × (1 + cos(θ)/2)  [interference]
+//   Decoherence: D = exp(−2×logistic_overdue)  [collapse after drawing]
+//   Tunneling: T = exp(−κ×barrier)
+//   Score = P×D + T + entanglement
 // =====================================================================
-function modelQuantum(data, pool, bpd, recentDraws) {
-  var ei    = pool / bpd;
-  var tau   = ei / 2;                // decoherence timescale = ei/2
-  var kappa = 1.8;                   // tunneling decay constant
+function modelQuantum(data, pool, bpd, recentDraws, totalDraws) {
+  var td=totalDraws||3019;
+  var freqs=data.map(function(d){return d[1];});
+  var fTotal=freqs.reduce(function(a,b){return a+b;},0);
+  var fMean=fTotal/data.length;
+  var kappa=1.8;
 
-  var freqs  = data.map(function(d){return d[1];});
-  var fTotal = freqs.reduce(function(a,b){return a+b;},0);
-  var fMean  = fTotal / data.length;
-
-  var eB = {};
-  ENTANGLED_PAIRS.forEach(function(pair){
-    eB[pair[0]] = (eB[pair[0]]||0) + 0.08;
-    eB[pair[1]] = (eB[pair[1]]||0) + 0.08;
+  var eB={};
+  ENTANGLED_PAIRS.forEach(function(p){
+    eB[p[0]]=(eB[p[0]]||0)+0.08;
+    eB[p[1]]=(eB[p[1]]||0)+0.08;
   });
 
-  var rm = buildRecentMap(recentDraws||[], false);
+  var rm=buildRecentMap(recentDraws||[], false);
 
   return data.map(function(r){
-    var num=r[0], freq=r[1], ago=r[2];
+    var num=r[0],freq=r[1],ago=r[2];
 
-    // Wave function amplitude and phase
-    var amp   = Math.sqrt(freq / fTotal);
-    var theta = 2 * Math.PI * ago / ei;     // phase = normalised absence time
+    var amp=Math.sqrt(freq/fTotal);
+    var ov=logisticOverdue(freq,ago,td);
+    // Phase tied to normalised overdue ratio → responsive to new draws
+    var theta=2*Math.PI*ov;
 
-    // Probability density with exact quantum interference
-    var psiR  = amp * Math.cos(theta);
-    var psiI  = amp * Math.sin(theta);
-    var prob  = (psiR*psiR + psiI*psiI) * (1 + Math.cos(theta)/2);
+    var psiR=amp*Math.cos(theta), psiI=amp*Math.sin(theta);
+    var prob=(psiR*psiR+psiI*psiI)*(1+Math.cos(theta)/2);
 
-    // Decoherence: D = exp(−ago/τ), τ = ei/2
-    // Just-drawn balls (ago≈0) have D≈1 initially but small prob from phase
-    // Long-absent balls have low D but high prob — balance creates natural spread
-    var decoh = Math.exp(-ago / tau);
+    // Decoherence: high when just drawn (ov≈0), low when very overdue (ov→1)
+    // D = exp(−2×ov): just drawn D→1 but prob→0; overdue D→0.14 but prob→high
+    // Natural balance without ad-hoc constants
+    var decoh=Math.exp(-2*ov);
 
-    // Quantum tunneling for cold balls
-    var barrier   = Math.max(fMean - freq, 0) / fMean;
-    var tunnel    = Math.exp(-kappa * barrier) * 0.12;
+    var barrier=Math.max(fMean-freq,0)/fMean;
+    var tunnel=Math.exp(-kappa*barrier)*0.12;
+    var entangle=eB[num]||0;
 
-    // Entanglement
-    var entangle  = eB[num] || 0;
+    var score=prob*decoh+tunnel+entangle;
 
-    var score = prob * decoh + tunnel + entangle;
+    var state=ov<0.1?"COLLAPSED":
+              Math.cos(theta)>0.3?"RESONANT":
+              Math.cos(theta)<-0.3?"DESTRUCTIVE":"SUPERPOSED";
 
-    var state = ago < 2    ? "COLLAPSED"
-              : Math.cos(theta) > 0.3  ? "RESONANT"
-              : Math.cos(theta) < -0.3 ? "DESTRUCTIVE"
-              :                          "SUPERPOSED";
-
-    return {
-      num:num, freq:freq, ago:ago, score:score,
-      amplitude:amp, theta:theta, interference:Math.cos(theta),
-      decoherence:decoh, tunneling:tunnel, entanglement:entangle, state:state,
-      recentHits: rm.hitMap[num]||0,
+    return{
+      num:num,freq:freq,ago:ago,score:score,
+      amplitude:amp,theta:theta,interference:Math.cos(theta),
+      decoherence:decoh,tunneling:tunnel,entanglement:entangle,state:state,
+      recentHits:rm.hitMap[num]||0,
       metrics:[
-        ["Amplitude |ψ|", amp.toFixed(5)],
-        ["Phase θ",       (theta%(2*Math.PI)).toFixed(4)],
+        ["Overdue ratio", ((ago*freq)/td).toFixed(3)],
+        ["Phase θ",       theta.toFixed(4)],
+        ["Amplitude|ψ|",  amp.toFixed(5)],
         ["Interference",  Math.cos(theta).toFixed(4)],
         ["Decoherence D", decoh.toFixed(4)],
-        ["Tunneling T",   tunnel.toFixed(4)],
         ["Recent hits",   (rm.hitMap[num]||0)+"/"+rm.W],
         ["QE Score",      score.toFixed(5)]
       ]
     };
   });
 }
+
+
 function applyBalanceFilter(cands){
   // Smart Play scores are -log(pop) — all negative, most negative = most unpopular
   // Normalise scores to [0,1] before combining with balance criteria
@@ -1070,12 +1067,12 @@ function App(){
   useEffect(function(){doFetch(false);},[]);
 
   // Models now receive recentDraws as 4th arg — this is what makes picks responsive
-  var fB=useMemo(function(){return modelFluid(balls,70,5,recentDraws);},[balls,recentDraws]);
+  var fB=useMemo(function(){return modelFluid(balls,70,5,recentDraws,info.total);},[balls,recentDraws,info.total]);
   var sB=useMemo(function(){return modelSmart(balls,70,5,info.total,recentDraws);},[balls,info.total,recentDraws]);
-  var qB=useMemo(function(){return modelQuantum(balls,70,5,recentDraws);},[balls,recentDraws]);
-  var fM=useMemo(function(){return modelFluid(mega,24,1,recentDraws);},[mega,recentDraws]);
+  var qB=useMemo(function(){return modelQuantum(balls,70,5,recentDraws,info.total);},[balls,recentDraws,info.total]);
+  var fM=useMemo(function(){return modelFluid(mega,24,1,recentDraws,info.total);},[mega,recentDraws,info.total]);
   var sM=useMemo(function(){return modelSmart(mega,24,1,info.total,recentDraws);},[mega,info.total,recentDraws]);
-  var qM=useMemo(function(){return modelQuantum(mega,24,1,recentDraws);},[mega,recentDraws]);
+  var qM=useMemo(function(){return modelQuantum(mega,24,1,recentDraws,info.total);},[mega,recentDraws,info.total]);
 
   var preds=useMemo(function(){
     var fTop=[...fB].sort(function(a,b){return b.score-a.score;});
@@ -1625,7 +1622,7 @@ function HelpModal(props) {
       blocks: [
         {head:"Core Idea", body:"Treats the pool of 70 balls as a fluid system. Each ball's draw history creates a measurable 'pressure' in the system, and its recency creates 'velocity'. The model finds balls that are energetically primed to appear."},
         {head:"Pressure  P = fᵢ / f̄", body:"Each ball's all-time draw frequency divided by the mean frequency. P > 1 means the ball is drawn more than average (hot). P < 1 means it's drawn less (cold). The model treats this as hydrostatic pressure — high-pressure balls push outward toward selection."},
-        {head:"Velocity  v = ago / ei", body:"Corrected formula. Δt = draws since last appearance. ei = expected return interval = pool/bpd = 14 for main balls. A ball just drawn has ago≈1 so v≈0.07 (at rest). A ball absent for 30 draws has v=2.14 (building momentum). No cap — the physics determines the value. Previously this formula was inverted, giving just-drawn balls maximum velocity (a bug)."},
+        {head:"Velocity  v = logistic_overdue(freq, ago)", body:"v = (ago × freq / TOTAL) / (1 + ago × freq / TOTAL). Normalises each ball by its OWN historical frequency. A ball drawn every 10 draws that hasn't appeared in 30 is far more overdue than a rare ball not seen in 30 draws. Logistic form [0,1) gives diminishing returns — when a ball IS drawn, v drops from ~0.87 to ~0.07, allowing the next-ranked ball to enter the top 5. This is what makes picks change after each draw."},
         {head:"Reynolds Number  Re = ρvL/μ", body:"Borrows the fluid turbulence formula. High Re (>4000) = turbulent regime — the ball is in a chaotic, energetic state and due for an event. Low Re = laminar flow — stable, predictable. The color coding in the field view reflects this: red = turbulent, green = neutral, blue = cold."},
         {head:"Bernoulli Energy  B = P + ½ρv²", body:"Total mechanical energy of a ball in the fluid system. Combines both the pressure (historical weight) and kinetic energy (recency momentum). The histogram in the Score Analysis tab shows B across all 70 balls."},
         {head:"NS-Forecast Score  F = 0.38v + 0.30P + 0.18/ω + 0.09f̂ + Δoverdue", body:"The final ensemble score. Weighted sum of velocity, pressure, inverse-vorticity (reward for balls near equilibrium), normalized frequency, and an overdue bonus for balls past 2× their expected return interval. Higher score = stronger prediction."}
