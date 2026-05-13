@@ -264,7 +264,10 @@ function modelFluid(data, pool, bpd, recentDraws) {
   var raw = data.map(function(r){
     var num=r[0], freq=r[1], ago=r[2];
     var P = freq / fMean;
-    var v = ago / ei;                      // CORRECTED velocity
+    // Logistic velocity: ago/(ago+ei) gives bounded [0,1) with diminishing returns.
+    // Prevents ultra-overdue balls from permanently dominating regardless of
+    // new draw activity. At ago=ei (expected interval): v=0.5 (natural midpoint).
+    var v = ago / (ago + ei);                 // logistic velocity [0,1)
     var Re = rho * v * L / mu;
     var B  = P + 0.5 * rho * v * v;
     var w  = Math.abs(P - 1);
@@ -312,34 +315,31 @@ function modelFluid(data, pool, bpd, recentDraws) {
 // =====================================================================
 // MODEL 2 — SMART PLAY  (Expected Value Maximisation)
 //
-// Derivation:
-//   E[payout | win] = Jackpot / E[number of winners]
-//   E[winners] ∝ Π popularity(ball_i)  over chosen combo
+// Derivation: E[payout|win] ∝ 1/∏pop(i) → maximise Σ −log(pop(i))
 //
-//   To maximise E[payout]: minimise Π pop_i
-//   ↔ maximise Σ log(1/pop_i) = Σ −log(pop_i)
+// Popularity model — CONTINUOUS across all 70 balls (70 distinct values):
+//   pop(n) = gaussian_decay(n) + round_bias(n) + specific_boosts(n)
 //
-//   Therefore: score_i = −log(popularity(i))   ← derived, not guessed
-//
-// Popularity is estimated from known player behaviour biases:
-//   birthday bias (n≤31), month bias (n≤12), round numbers,
-//   culturally "lucky" numbers — all documented in lottery research.
-//
-// Balance filter: applied to top candidates post-scoring.
-//   Constraints from historical draw distributions:
-//     sum ∈ [100,175], 2–3 odd, 2–3 low (≤35)
+// Sources: Clotfelter & Cook (1993), Walker (1998) — documented lottery
+// player biases: birthday clustering (1-31), round-number preference,
+// culturally lucky numbers, smooth underplay of high numbers (32-70).
 // =====================================================================
 function modelSmart(data, pool, bpd, totalDraws, recentDraws) {
-  // Popularity model: probability a random player picks ball n
-  // Relative to uniform = 1.0.  Sources: birthday/calendar bias,
-  // round-number preference, culturally lucky numbers.
   function popularity(n) {
-    var p = 1.0;
-    if (n <= 31) p *= 1.85;   // birthday effect
-    if (n <= 12) p *= 1.20;   // month numbers
-    if (n % 10 === 0) p *= 1.30;  // round numbers
-    if ([7,11,13,17,21,23].indexOf(n) >= 0) p *= 1.40;  // "lucky" primes
-    return p;
+    // Smooth Gaussian decay: players strongly prefer low numbers (birthdays/dates)
+    // Centred at n=1, σ=22 → at n=31 we're ~1.4σ, still elevated
+    var base = 1.0 + 1.2 * Math.exp(-Math.pow(n - 1, 2) / (2 * 22 * 22));
+    // Round number bias persists across full 1-70 range
+    var round5  = n % 5  === 0 ? 0.25 : 0.0;
+    var round10 = n % 10 === 0 ? 0.15 : 0.0;
+    // Specific culturally overplayed numbers (documented in literature)
+    var lucky = {7:0.60, 11:0.45, 13:0.35, 17:0.35, 21:0.30, 23:0.25,
+                 3:0.20, 9:0.15, 27:0.15, 33:0.10, 37:0.10, 42:0.10, 69:0.15};
+    var luckyBoost = lucky[n] || 0.0;
+    // Age-milestone numbers (slightly more popular)
+    var ageNums = [18,21,25,30,35,40,45,50,55,60,65];
+    var ageBoost = ageNums.indexOf(n) >= 0 ? 0.08 : 0.0;
+    return base + round5 + round10 + luckyBoost + ageBoost;
   }
 
   var rm = buildRecentMap(recentDraws||[], false);
@@ -347,20 +347,20 @@ function modelSmart(data, pool, bpd, totalDraws, recentDraws) {
   return data.map(function(r){
     var num=r[0], freq=r[1], ago=r[2];
     var pop   = popularity(num);
-    // EV-derived score: −log(popularity)
-    // More negative popularity → less likely to be shared → higher payout
-    var score = -Math.log(pop);
-    var tag = pop > 1.5 ? "Overplayed" : pop > 1.2 ? "Popular" : "Contrarian";
+    var score = -Math.log(pop);   // derived: maximise Σ −log(pop_i)
+    var tag = pop > 2.0 ? "Overplayed"
+            : pop > 1.4 ? "Popular"
+            : pop > 1.1 ? "Mild"
+            :              "Contrarian";
     return {
-      num:num, freq:freq, ago:ago, score:score,
-      pop:pop, tag:tag,
+      num:num, freq:freq, ago:ago, score:score, pop:pop, tag:tag,
       recentHits: rm.hitMap[num]||0,
       metrics:[
-        ["Popularity",    pop.toFixed(4)],
-        ["-log(pop)",     score.toFixed(4)],
-        ["EV weight",     (Math.exp(score)).toFixed(4)],
-        ["Recent hits",   (rm.hitMap[num]||0)+"/"+rm.W],
-        ["Tag",           tag]
+        ["Popularity",  pop.toFixed(4)],
+        ["-log(pop)",   score.toFixed(4)],
+        ["EV weight",   Math.exp(score).toFixed(4)],
+        ["Recent hits", (rm.hitMap[num]||0)+"/"+rm.W],
+        ["Tag",         tag]
       ]
     };
   });
@@ -530,6 +530,8 @@ function BallEl(props){
 function TrackerTab(props){
   var currentPreds=props.currentPreds;
   var history=props.history, setHistory=props.setHistory;
+  var lastDrawDate=props.lastDrawDate||"";
+  var newDrawsFound=props.newDrawsFound||0;
 
   var showFormState=useState(false);
   var showForm=showFormState[0], setShowForm=showFormState[1];
@@ -551,8 +553,12 @@ function TrackerTab(props){
   // When form opens, pre-fill predictions from current model picks
   function openForm(){
     var p=currentPreds;
+    // Use lastDrawDate as the default date (most likely what user is logging)
+    var defaultDate = lastDrawDate || formState[0].date;
     setForm(function(prev){
       return Object.assign({},prev,{
+        date: defaultDate,
+        // Pre-fill predictions from CURRENT model picks (reflect latest merged data)
         fp1:String(p[0].main[0]),fp2:String(p[0].main[1]),fp3:String(p[0].main[2]),fp4:String(p[0].main[3]),fp5:String(p[0].main[4]),fmb:String(p[0].mega),
         sp1:String(p[1].main[0]),sp2:String(p[1].main[1]),sp3:String(p[1].main[2]),sp4:String(p[1].main[3]),sp5:String(p[1].main[4]),smb:String(p[1].mega),
         qp1:String(p[2].main[0]),qp2:String(p[2].main[1]),qp3:String(p[2].main[2]),qp4:String(p[2].main[3]),qp5:String(p[2].main[4]),qmb:String(p[2].mega)
@@ -648,8 +654,35 @@ function TrackerTab(props){
   var panelTracker=mkPanel("tracker");
   var lblTracker=mkLbl(TH.tracker.p);
 
+  // Check if this draw date is already logged
+  var alreadyLogged = history.some(function(h){ return h.date===lastDrawDate; });
+  var showNewDrawBanner = newDrawsFound>0 && lastDrawDate && !alreadyLogged;
+
   return (
     <div style={{position:"relative",zIndex:1}}>
+
+      {/* New draw banner */}
+      {showNewDrawBanner && (
+        <div style={{background:"rgba(0,60,20,0.8)",border:"1px solid rgba(0,220,100,0.5)",
+          borderRadius:"6px",padding:"10px 14px",marginBottom:"10px",
+          display:"flex",alignItems:"center",justifyContent:"space-between",
+          flexWrap:"wrap",gap:"8px",animation:"flowIn 0.4s ease"}}>
+          <div>
+            <div style={{fontSize:"10px",color:"#00e676",fontWeight:"bold",letterSpacing:"0.12em"}}>
+              &#9679; {newDrawsFound} NEW DRAW{newDrawsFound!==1?"S":""} DETECTED
+            </div>
+            <div style={{fontSize:"8px",color:"#4a8a5a",marginTop:"2px"}}>
+              Latest: {lastDrawDate} · Log the result to track model performance
+            </div>
+          </div>
+          <button onClick={openForm} style={{
+            padding:"6px 16px",fontSize:"8px",letterSpacing:"0.15em",textTransform:"uppercase",
+            background:"rgba(0,200,80,0.2)",border:"1px solid rgba(0,220,100,0.7)",
+            color:"#00e676",borderRadius:"4px",cursor:"pointer",fontFamily:"inherit"}}>
+            LOG DRAW &#9658;
+          </button>
+        </div>
+      )}
 
       {/* Stats Panel */}
       <div style={{...panelTracker,marginBottom:"12px"}}>
@@ -1022,7 +1055,8 @@ function App(){
         lastDrawDate:latestDate,
         lastChecked:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
         newOnRefresh:isRefresh?newSinceLast:null,
-        phase:isRefresh?(newSinceLast>0?"new_draws":"up_to_date"):"loaded",
+        // Phase: always "loaded" after merge — "new_draws" only for truly new data
+        phase:isRefresh?(newSinceLast>0?"new_draws":"synced"):"loaded",
         error:null
       });
       setAppStatus("ready");
@@ -1065,12 +1099,19 @@ function App(){
     );
   }
 
-  var dotColor=info.phase==="error"?"#ff6b35":info.phase==="new_draws"?"#00e676":info.phase==="up_to_date"?"#448aff":info.totalLoaded>0?"#00e676":"#448aff";
-  var dotMsg=info.phase==="error"?"API ERROR - BASELINE"
-    :info.phase==="new_draws"?info.newOnRefresh+" NEW DRAW"+(info.newOnRefresh!==1?"S":"")+" ADDED - PICKS UPDATED"
-    :info.phase==="up_to_date"?"UP TO DATE - CHECKED "+info.lastChecked
-    :info.totalLoaded>0?info.totalLoaded+" DRAWS LOADED SINCE "+BASELINE_DATE
-    :"BASELINE DATA";
+  var dotColor = info.phase==="error"  ? "#ff6b35"
+              : info.phase==="new_draws" ? "#00e676"
+              : info.totalLoaded>0       ? "#00e676"
+              :                            "#448aff";
+  var apiDrawsMsg = info.totalLoaded > 0
+    ? info.totalLoaded+" DRAW"+(info.totalLoaded!==1?"S":"")+" SINCE "+BASELINE_DATE+" · LATEST: "+info.lastDrawDate
+    : "NO NEW DRAWS FOUND AFTER "+BASELINE_DATE+" (API MAY LAG UP TO 24H)";
+  var dotMsg = info.phase==="error"     ? "API ERROR — USING BASELINE"
+             : info.phase==="new_draws" ? info.newOnRefresh+" NEW DRAW"+(info.newOnRefresh!==1?"S":"")+
+                                          " ADDED · PICKS UPDATED · "+apiDrawsMsg
+             : info.phase==="loaded"    ? "MODELS COMPUTED · "+apiDrawsMsg
+             : info.phase==="synced"    ? "API SYNCED "+info.lastChecked+" · "+apiDrawsMsg
+             :                            apiDrawsMsg;
 
   return (
     <div style={{background:"linear-gradient(160deg,#020812,#04101e 50%,#030a18)",
@@ -1248,7 +1289,13 @@ function App(){
       {/* TRACKER */}
       {tab==="tracker"&&(
         <div className="ts">
-          <TrackerTab currentPreds={preds} history={history} setHistory={setHistory}/>
+          <TrackerTab
+            currentPreds={preds}
+            history={history}
+            setHistory={setHistory}
+            lastDrawDate={info.lastDrawDate}
+            newDrawsFound={info.phase==="new_draws" ? info.newOnRefresh : 0}
+          />
         </div>
       )}
 
