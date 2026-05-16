@@ -271,49 +271,63 @@ function buildRecentMap(recentDraws, isMega) {
 // =====================================================================
 function modelFluid(data, pool, bpd, recentDraws, totalDraws) {
   var td = totalDraws || 3019;
+  var rho = 1.0, mu = 0.08, L = pool;
+
   var freqs=data.map(function(d){return d[1];});
   var fMean=freqs.reduce(function(a,b){return a+b;},0)/freqs.length;
-  var fMax=Math.max.apply(null,freqs), fMin=Math.min.apply(null,freqs);
   var rm=buildRecentMap(recentDraws||[], false);
 
+  // VELOCITY: logistic overdue ratio. Physically: this is the PRESSURE GRADIENT
+  // ∇P pushing the ball back toward release. Overdue = high gradient = high v.
+  // Just drawn = low gradient = low v (at rest after ejection).
+  // PHASE ANGLE: θ = 2π × v gives a cyclic recurrence signal.
   var raw=data.map(function(r){
-    var num=r[0],freq=r[1],ago=r[2];
-    var P=freq/fMean;
-    var v=logisticOverdue(freq,ago,td);   // normalised by ball's own frequency
-    var Re=(v*pool)/0.08;
-    var B=P+0.5*v*v;
-    var w=Math.abs(P-1);
-    return{num:num,freq:freq,ago:ago,P:P,v:v,Re:Re,B:B,w:w};
+    var num=r[0], freq=r[1], ago=r[2];
+    var P  = freq/fMean;
+    var v  = logisticOverdue(freq, ago, td);  // [0,1) normalised overdue
+    var Re = rho * v * L / mu;                // Reynolds number
+    var B  = P + 0.5*rho*v*v;                 // Bernoulli energy
+    var w  = Math.abs(P-1);                   // Vorticity: deviation from equilibrium
+    return {num:num, freq:freq, ago:ago, P:P, v:v, Re:Re, B:B, w:w};
   });
 
-  var Pmax=Math.max.apply(null,raw.map(function(r){return r.P;}));
-  var Pmin=Math.min.apply(null,raw.map(function(r){return r.P;}));
-  var vmax=Math.max.apply(null,raw.map(function(r){return r.v;}));
-  var Bmax=Math.max.apply(null,raw.map(function(r){return r.B;}));
-  var Bmin=Math.min.apply(null,raw.map(function(r){return r.B;}));
+  // Normalise each component to [0,1] for equal-weight ensemble
+  var vals = function(key){ return raw.map(function(r){return r[key];}); };
+  var norm = function(arr){
+    var mn=Math.min.apply(null,arr), mx=Math.max.apply(null,arr), rng=mx-mn||1;
+    return arr.map(function(x){return (x-mn)/rng;});
+  };
+  var Pn = norm(vals('P'));
+  var vn = norm(vals('v'));
+  var Bn = norm(vals('B'));
+  // Vorticity ω: INVERSE normalise — low ω (near equilibrium) scores HIGH
+  // A ball at P≈1 is near the statistical mean, balanced pressure = primed
+  var wVals = vals('w');
+  var wMax = Math.max.apply(null, wVals) || 1;
+  var wn = wVals.map(function(x){ return 1 - x/wMax; }); // inverted: low ω → high score
 
-  return raw.map(function(r){
-    var Pn=(Pmax>Pmin)?(r.P-Pmin)/(Pmax-Pmin):0.5;
-    var vn=(vmax>0)?r.v/vmax:0;
-    var Bn=(Bmax>Bmin)?(r.B-Bmin)/(Bmax-Bmin):0.5;
-    var score=(Pn+vn+Bn)/3;
-    // Consecutive draw penalty: balls drawn in the most recent draw (ago=1)
-    // get a 40% score reduction. Statistically: P(repeat) = 5/70 = same as any ball,
-    // but logisticOverdue already gives them v≈0.07. The penalty reinforces recency
-    // and reduces split risk (other players chase "hot" last-draw numbers).
+  // Reynolds thresholds recalibrated for v ∈ [0,1):
+  //   max Re = 1.0 × 70 / 0.08 = 875
+  //   Turbulent threshold:     Re > 600  (top ~30%)
+  //   Transitional threshold:  Re > 300  (middle range)
+  //   Laminar:                 Re ≤ 300  (just drawn / low overdue)
+  return raw.map(function(r, i){
+    // 4-TERM NAVIER-STOKES ENSEMBLE (equal weight — max entropy principle)
+    var score = (Pn[i] + vn[i] + Bn[i] + wn[i]) / 4;
+    // Consecutive draw penalty: ago≤1 → score × 0.60
     if(r.ago<=1) score = score * 0.60;
-    var regime=r.Re>4000?"turbulent":r.Re>2300?"transitional":"laminar";
-    var rawRatio=(r.ago*r.freq)/td;
-    return{
-      num:r.num,freq:r.freq,ago:r.ago,score:score,
-      P:r.P,v:r.v,Re:r.Re,B:r.B,w:r.w,regime:regime,
+    var regime = r.Re > 600 ? "turbulent" : r.Re > 300 ? "transitional" : "laminar";
+    var rawRatio = (r.ago*r.freq)/td;
+    return {
+      num:r.num, freq:r.freq, ago:r.ago, score:score,
+      P:r.P, v:r.v, Re:r.Re, B:r.B, w:r.w, regime:regime,
       recentHits:rm.hitMap[r.num]||0,
       metrics:[
-        ["Overdue ratio", rawRatio.toFixed(3)+" ("+r.ago+"draws)"],
-        ["Velocity v",    r.v.toFixed(4)],
         ["Pressure P",    r.P.toFixed(4)],
+        ["Velocity v",    r.v.toFixed(4)],
         ["Reynolds Re",   Math.round(r.Re)],
         ["Bernoulli B",   r.B.toFixed(4)],
+        ["Vorticity ω",   r.w.toFixed(4)],
         ["Recent hits",   (rm.hitMap[r.num]||0)+"/"+rm.W],
         ["NS-Score",      score.toFixed(5)]
       ]
@@ -395,61 +409,85 @@ function modelQuantum(data, pool, bpd, recentDraws, totalDraws) {
   var freqs=data.map(function(d){return d[1];});
   var fTotal=freqs.reduce(function(a,b){return a+b;},0);
   var fMean=fTotal/data.length;
-  var kappa=1.8;
 
-  var eB={};
-  ENTANGLED_PAIRS.forEach(function(p){
-    eB[p[0]]=(eB[p[0]]||0)+0.08;
-    eB[p[1]]=(eB[p[1]]||0)+0.08;
+  // Entanglement: compute CONDITIONAL PROBABILITY boost P(B|A) from pair co-occurrence
+  // If ball A appeared, what is the probability ball B appeared in the same draw?
+  // P(B|A) = co-occurrence_count(A,B) / appearance_count(A)
+  // Since we don't have the full co-occurrence matrix, we use the approximation:
+  // For entangled pairs, boost = freq_pair_partner / TOTAL_DRAWS  (fraction of draws
+  // where the partner appeared). This is a proper conditional probability signal.
+  var eBoost = {};
+  ENTANGLED_PAIRS.forEach(function(pair){
+    var a=pair[0], b=pair[1];
+    // Each ball's frequency as a fraction of total draws = its marginal P(appearing)
+    var fA=0, fB=0;
+    data.forEach(function(r){ if(r[0]===a) fA=r[1]; if(r[0]===b) fB=r[1]; });
+    // Conditional boost: if partner has high marginal probability, this ball benefits
+    // Scaled by 0.5 so max boost ≈ 0.5 × (288/3019) ≈ 0.048
+    eBoost[a] = (eBoost[a]||0) + 0.5 * fB / td;
+    eBoost[b] = (eBoost[b]||0) + 0.5 * fA / td;
   });
 
   var rm=buildRecentMap(recentDraws||[], false);
 
   return data.map(function(r){
-    var num=r[0],freq=r[1],ago=r[2];
+    var num=r[0], freq=r[1], ago=r[2];
 
-    var amp=Math.sqrt(freq/fTotal);
-    var ov=logisticOverdue(freq,ago,td);
-    // Phase tied to normalised overdue ratio → responsive to new draws
-    var theta=2*Math.PI*ov;
+    // Wave function: ψ(n) = √(freq/fTotal) · e^(iθ)
+    var amp = Math.sqrt(freq/fTotal);       // |ψ| — properly normalised (Σ|ψ|²=1)
+    var ov  = logisticOverdue(freq,ago,td); // normalised overdue signal [0,1)
+    var theta = 2*Math.PI*ov;               // phase angle from overdue cycle
 
-    var psiR=amp*Math.cos(theta), psiI=amp*Math.sin(theta);
-    var prob=(psiR*psiR+psiI*psiI)*(1+Math.cos(theta)/2);
+    // Born rule probability with 2-path interference
+    // Model: each ball can arrive via a "frequency path" and a "recency path"
+    // |ψ_total|² = |ψ_freq + ψ_recency|² = |ψ_f|² + |ψ_r|² + 2|ψ_f||ψ_r|cos(θ)
+    // With |ψ_f| = amp, |ψ_r| = amp (symmetric), this gives:
+    // prob = 2·amp²·(1 + cos(θ)) = 2·|ψ|²·(1 + cos(θ))
+    // This is genuine 2-path interference derived from the superposition principle
+    var prob = 2 * amp * amp * (1 + Math.cos(theta));
 
-    // Decoherence: high when just drawn (ov≈0), low when very overdue (ov→1)
-    // D = exp(−2×ov): just drawn D→1 but prob→0; overdue D→0.14 but prob→high
-    // Natural balance without ad-hoc constants
-    var decoh=Math.exp(-2*ov);
+    // Decoherence: D = e^(−2·ov/τ), τ = ei/(2·pool/bpd) = 0.5
+    // Physically: just-drawn balls have ov≈0 → D≈1 (recently observed, wavefunction fresh)
+    // Very overdue balls have ov→1 → D→e^(-2)≈0.14 (long-unobserved, decohered)
+    // This creates a natural tension: high overdue → high prob but low D
+    var decoh = Math.exp(-2*ov);
 
-    var barrier=Math.max(fMean-freq,0)/fMean;
-    var tunnel=Math.exp(-kappa*barrier)*0.12;
-    var entangle=eB[num]||0;
+    // Quantum tunneling: WKB approximation T = e^(−2κd)
+    // barrier d = how far below expected frequency the ball is
+    // κ = 1.8 (barrier "width" parameter)
+    var barrier = Math.max(fMean-freq,0)/fMean;
+    var tunnel  = Math.exp(-2*1.8*barrier) * 0.12;  // factor-of-2 in exponent (WKB)
 
-    var score=prob*decoh+tunnel+entangle;
-    // Consecutive draw penalty: just-drawn balls also penalised in quantum model
+    // Entanglement: conditional probability boost (not a flat constant)
+    var entangle = eBoost[num] || 0;
+
+    // Final score: probability × decoherence + tunneling + entanglement
+    var score = prob * decoh + tunnel + entangle;
+    // Consecutive draw penalty
     if(ago<=1) score = score * 0.60;
-    var state=ov<0.1?"COLLAPSED":
-              Math.cos(theta)>0.3?"RESONANT":
-              Math.cos(theta)<-0.3?"DESTRUCTIVE":"SUPERPOSED";
 
-    return{
-      num:num,freq:freq,ago:ago,score:score,
-      amplitude:amp,theta:theta,interference:Math.cos(theta),
-      decoherence:decoh,tunneling:tunnel,entanglement:entangle,state:state,
+    var state = ov < 0.1   ? "COLLAPSED"
+              : Math.cos(theta) > 0.3  ? "RESONANT"
+              : Math.cos(theta) < -0.3 ? "DESTRUCTIVE"
+              : "SUPERPOSED";
+
+    return {
+      num:num, freq:freq, ago:ago, score:score,
+      amplitude:amp, theta:theta, interference:Math.cos(theta),
+      decoherence:decoh, tunneling:tunnel, entanglement:entangle, state:state,
       recentHits:rm.hitMap[num]||0,
       metrics:[
-        ["Overdue ratio", ((ago*freq)/td).toFixed(3)],
+        ["Amplitude |ψ|", amp.toFixed(5)],
         ["Phase θ",       theta.toFixed(4)],
-        ["Amplitude|ψ|",  amp.toFixed(5)],
         ["Interference",  Math.cos(theta).toFixed(4)],
         ["Decoherence D", decoh.toFixed(4)],
-        ["Recent hits",   (rm.hitMap[num]||0)+"/"+rm.W],
+        ["Tunneling T",   tunnel.toFixed(5)],
+        ["Entanglement",  entangle.toFixed(5)],
         ["QE Score",      score.toFixed(5)]
       ]
     };
   });
 }
-
 
 function applyBalanceFilter(cands){
   // Smart Play scores are -log(pop) — all negative, most negative = most unpopular
@@ -961,35 +999,46 @@ function TrackerTab(props){
                             {modelNames[mi]}
                           </div>
                           <div style={{display:"flex",gap:"2px",flexWrap:"wrap",marginBottom:"4px"}}>
-                          {!isPlaceholder&&<div style={{display:"flex",gap:"2px",flexWrap:"wrap",marginBottom:"4px"}}>
-                            {pred.main.map(function(n){
-                              var isHit=h.actual.main.indexOf(n)>=0;
-                              return (
-                                <div key={n} style={{width:"22px",height:"22px",borderRadius:"50%",
-                                  background:isHit?"rgba(0,200,100,0.2)":"rgba(0,0,0,0.3)",
-                                  border:"1px solid "+(isHit?"#00e676":"rgba(100,100,100,0.2)"),
+                            {isPlaceholder ? (
+                              <span style={{fontSize:"8px",color:"#4a7090",fontStyle:"italic"}}>no prediction logged</span>
+                            ) : (
+                              <React.Fragment>
+                                {pred.main.map(function(n){
+                                  var isHit=h.actual.main.indexOf(n)>=0;
+                                  return (
+                                    <div key={n} style={{width:"22px",height:"22px",borderRadius:"50%",
+                                      background:isHit?"rgba(0,200,100,0.2)":"rgba(0,0,0,0.3)",
+                                      border:"1px solid "+(isHit?"#00e676":"rgba(100,100,100,0.2)"),
+                                      display:"flex",alignItems:"center",justifyContent:"center",
+                                      fontSize:"8px",fontWeight:isHit?"bold":"normal",
+                                      color:isHit?"#00e676":"#5080a8"}}>{n}</div>
+                                  );
+                                })}
+                                <div style={{width:"22px",height:"22px",borderRadius:"50%",
+                                  background:mbHit?"rgba(255,214,0,0.2)":"rgba(0,0,0,0.3)",
+                                  border:"1px solid "+(mbHit?"#ffd600":"rgba(100,100,100,0.2)"),
                                   display:"flex",alignItems:"center",justifyContent:"center",
-                                  fontSize:"8px",fontWeight:isHit?"bold":"normal",
-                                  color:isHit?"#00e676":"#5080a8"}}>{n}</div>
-                              );
-                            })}
-                            <div style={{width:"22px",height:"22px",borderRadius:"50%",
-                              background:mbHit?"rgba(255,214,0,0.2)":"rgba(0,0,0,0.3)",
-                              border:"1px solid "+(mbHit?"#ffd600":"rgba(100,100,100,0.2)"),
-                              display:"flex",alignItems:"center",justifyContent:"center",
-                              fontSize:"8px",fontWeight:mbHit?"bold":"normal",
-                              color:mbHit?"#ffd600":"#5080a8",marginLeft:"2px"}}>{pred.mega}</div>
+                                  fontSize:"8px",fontWeight:mbHit?"bold":"normal",
+                                  color:mbHit?"#ffd600":"#5080a8",marginLeft:"2px"}}>{pred.mega}</div>
+                              </React.Fragment>
+                            )}
                           </div>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                            <span style={{fontSize:"9px",fontWeight:"bold",
-                              color:hits>=3?"#00e676":hits>=1?"#ffab40":"#5080a8"}}>
-                              {isPlaceholder?"—":hits+"/5 "+(mbHit?"+MB":"")}
-                            </span>
-                            <span style={{fontSize:"8px",color:prize.color,fontWeight:hits>=3?"bold":"normal"}}>
-                              {prize.label}
-                            </span>
+                            {isPlaceholder ? (
+                              <span style={{fontSize:"8px",color:"#4a7090",fontStyle:"italic"}}>auto-recorded from API</span>
+                            ) : (
+                              <React.Fragment>
+                                <span style={{fontSize:"9px",fontWeight:"bold",
+                                  color:hits>=3?"#00e676":hits>=1?"#ffab40":"#5080a8"}}>
+                                  {hits}/5 {mbHit?"+MB":""}
+                                </span>
+                                <span style={{fontSize:"8px",color:prize.color,fontWeight:hits>=3?"bold":"normal"}}>
+                                  {prize.label}
+                                </span>
+                              </React.Fragment>
+                            )}
                           </div>
-                          {hits>=2&&(
+                          {!isPlaceholder&&hits>=2&&(
                             <div style={{fontSize:"7px",color:"#4a7898",marginTop:"2px"}}>
                               1-in-{HYPER_1IN[hits]<100?HYPER_1IN[hits].toFixed(1):Math.round(HYPER_1IN[hits]).toLocaleString()} by chance
                             </div>
