@@ -297,6 +297,11 @@ function modelFluid(data, pool, bpd, recentDraws, totalDraws) {
     var vn=(vmax>0)?r.v/vmax:0;
     var Bn=(Bmax>Bmin)?(r.B-Bmin)/(Bmax-Bmin):0.5;
     var score=(Pn+vn+Bn)/3;
+    // Consecutive draw penalty: balls drawn in the most recent draw (ago=1)
+    // get a 40% score reduction. Statistically: P(repeat) = 5/70 = same as any ball,
+    // but logisticOverdue already gives them v≈0.07. The penalty reinforces recency
+    // and reduces split risk (other players chase "hot" last-draw numbers).
+    if(r.ago<=1) score = score * 0.60;
     var regime=r.Re>4000?"turbulent":r.Re>2300?"transitional":"laminar";
     var rawRatio=(r.ago*r.freq)/td;
     return{
@@ -421,7 +426,8 @@ function modelQuantum(data, pool, bpd, recentDraws, totalDraws) {
     var entangle=eB[num]||0;
 
     var score=prob*decoh+tunnel+entangle;
-
+    // Consecutive draw penalty: just-drawn balls also penalised in quantum model
+    if(ago<=1) score = score * 0.60;
     var state=ov<0.1?"COLLAPSED":
               Math.cos(theta)>0.3?"RESONANT":
               Math.cos(theta)<-0.3?"DESTRUCTIVE":"SUPERPOSED";
@@ -913,7 +919,7 @@ function TrackerTab(props){
                   {/* Header row */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px",flexWrap:"wrap",gap:"6px"}}>
                     <span style={{fontSize:"10px",color:TH.tracker.p,fontWeight:"bold",letterSpacing:"0.1em"}}>
-                      {h.date}
+                      {h.date}{h.autoRecorded&&<span style={{fontSize:"7px",color:"#4a8a5a",marginLeft:"6px",background:"rgba(0,150,60,0.15)",border:"1px solid rgba(0,150,60,0.3)",borderRadius:"3px",padding:"1px 5px"}}>AUTO</span>}
                     </span>
                     <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
                       {/* Actual balls */}
@@ -943,8 +949,10 @@ function TrackerTab(props){
                     {h.preds.map(function(pred,mi){
                       if(!pred||!pred.main||pred.main.length!==5)return null;
                       var modelColor=modelColors[mi];
-                      var hits=pred.main.filter(function(n){return h.actual.main.indexOf(n)>=0;}).length;
-                      var mbHit=pred.mega===h.actual.mega;
+                      // Auto-recorded entries have placeholder zeros for predictions
+                      var isPlaceholder=pred.main[0]===0;
+                      var hits=isPlaceholder?0:pred.main.filter(function(n){return h.actual.main.indexOf(n)>=0;}).length;
+                      var mbHit=isPlaceholder?false:pred.mega===h.actual.mega;
                       var prize=prizeTier(hits,mbHit);
                       return (
                         <div key={pred.model} style={{background:"rgba(0,15,35,0.7)",
@@ -953,6 +961,7 @@ function TrackerTab(props){
                             {modelNames[mi]}
                           </div>
                           <div style={{display:"flex",gap:"2px",flexWrap:"wrap",marginBottom:"4px"}}>
+                          {!isPlaceholder&&<div style={{display:"flex",gap:"2px",flexWrap:"wrap",marginBottom:"4px"}}>
                             {pred.main.map(function(n){
                               var isHit=h.actual.main.indexOf(n)>=0;
                               return (
@@ -974,7 +983,7 @@ function TrackerTab(props){
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                             <span style={{fontSize:"9px",fontWeight:"bold",
                               color:hits>=3?"#00e676":hits>=1?"#ffab40":"#5080a8"}}>
-                              {hits}/5 {mbHit?"+MB":""}
+                              {isPlaceholder?"—":hits+"/5 "+(mbHit?"+MB":"")}
                             </span>
                             <span style={{fontSize:"8px",color:prize.color,fontWeight:hits>=3?"bold":"normal"}}>
                               {prize.label}
@@ -1042,8 +1051,40 @@ function App(){
         setBalls(m.balls);
         setMega(m.mega);
         saveBallCache(m.balls, m.mega, latestDate, BASE_DRAWS+nd.length, recentParsed);
+        // Auto-record actual winning numbers into tracker history
+        // Only add draws not already logged (avoid duplicates)
+        setHistory(function(prev){
+          var existingDates = {};
+          prev.forEach(function(h){ existingDates[h.date]=true; });
+          var newEntries = [];
+          nd.forEach(function(d){
+            var dt = (d.draw_date||"").substring(0,10);
+            if(!existingDates[dt] && dt > BASELINE_DATE){
+              var balls = (d.winning_numbers||"").trim().split(/\s+/).map(Number).filter(function(n){return n>=1&&n<=70;});
+              var mega  = parseInt(d.mega_ball||"0",10);
+              if(balls.length===5 && mega>=1 && mega<=24){
+                newEntries.push({
+                  id: dt+"_api",
+                  date: dt,
+                  actual: {main: balls.sort(function(a,b){return a-b;}), mega: mega},
+                  // Empty predictions — user fills these in after the fact
+                  preds: [
+                    {model:"fluid",   main:[0,0,0,0,0], mega:0},
+                    {model:"smart",   main:[0,0,0,0,0], mega:0},
+                    {model:"quantum", main:[0,0,0,0,0], mega:0}
+                  ],
+                  autoRecorded: true
+                });
+              }
+            }
+          });
+          if(newEntries.length===0) return prev;
+          // Newest first
+          var updated = newEntries.reverse().concat(prev);
+          storageSave(updated);
+          return updated;
+        });
       }
-      // If nd.length===0: no new draws since baseline — no cache update needed
       setRecentDraws(recentParsed);
       lastLoadedDateRef.current=latestDate;
       setInfo({
@@ -1057,10 +1098,12 @@ function App(){
         error:null
       });
       setAppStatus("ready");
+      if(window.__hideLoading) window.__hideLoading();
       if(isRefresh)setRefreshing(false);
     }).catch(function(e){
       setInfo(function(prev){return Object.assign({},prev,{phase:"error",error:e.message});});
       setAppStatus("ready");
+      if(window.__hideLoading) window.__hideLoading();
       if(isRefresh)setRefreshing(false);
     });
   }
@@ -1752,9 +1795,14 @@ function HelpModal(props) {
 // Mount
 var rootEl=ReactDOM.createRoot(document.getElementById("root"));
 rootEl.render(React.createElement(App,null));
-// Loading screen stays until React mounts and API fetch completes (handled by appStatus)
-// Fallback: remove after 8s in case of slow network
-setTimeout(function(){var l=document.getElementById("loading");if(l){l.style.opacity="0";setTimeout(function(){l.remove();},400);}},8000);
+// Loading screen removed when React calls window.__hideLoading()
+// which is triggered by setAppStatus("ready") inside the component
+window.__hideLoading = function() {
+  var l = document.getElementById("loading");
+  if (l) { l.style.opacity="0"; setTimeout(function(){if(l.parentNode)l.parentNode.removeChild(l);},400); }
+};
+// Safety fallback only
+setTimeout(function(){ if(window.__hideLoading) window.__hideLoading(); }, 12000);
 </script>
 </body>
 </html>
